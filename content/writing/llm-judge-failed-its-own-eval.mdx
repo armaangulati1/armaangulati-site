@@ -1,0 +1,32 @@
+---
+title: "When Your LLM Judge Fails Its Own Eval"
+date: 2026-07-14
+summary: "I built an LLM judge to score an agent's output, checked it against human ratings before trusting it, and it failed badly enough that I cut it and kept the objective metric instead."
+tags: ["evals", "llm-as-judge", "healthcare-ai", "agents"]
+---
+
+I built clinical-ops-copilot to automate the mechanical part of prior authorization: read a chart, check it against a payer's coverage policy, and recommend submit, request more information, or flag a likely denial before anyone wastes twenty minutes filing paperwork that gets denied anyway. Every recommendation goes through a human approval gate before anything happens, and the decision itself is measured against a locked, held-out test set: macro-F1 of 0.9373 (93.7%) on a synthetic, human-confirmed n=16 split. That number is objective: it is scored against a fixed, held-out answer key, and I can name exactly which sixteen cases produced it.
+
+The harder question was how to score something that isn't a three-way classification. When the agent decides a case needs more information, the action side of the system drafts a prior-auth follow-up email requesting what's missing. Grading that email by hand doesn't scale, and there's no ground-truth label for "is this email clear and correctly scoped." That's the textbook case for an LLM-as-judge: use a second model to rate the first model's output on a dimension a fixed metric can't capture.
+
+## Building the judge
+
+So I built one. Before I let it near a reported number, I ran the same discipline I use on the rest of the system: validate the judge against real human ratings before trusting its output. I collected human ratings for eight of the agent's generated emails, then ran the judge model over the same eight cases and compared.
+
+The judge failed. Exact agreement with the human ratings was 0%. Its average score missed the human rating by 1.38 points. Worst of all, the Pearson correlation between judge scores and human scores was approximately -0.29: the judge's ratings moved in the opposite direction from the human ratings more often than they moved with them. A coin flip would have done better. An LLM judge that anti-correlates with human judgment is not a noisy metric that averages out with more samples. It is actively pointing the wrong direction, and wiring it into anything downstream would have made the system worse while a dashboard said it was getting better.
+
+## Why I cut it
+
+So I excluded it. It is not in the reported eval numbers, and the decision metric is the headline number the system is scored on. The judge stays in the repo as a documented, working example of a validation step that failed its own validation, because that failure is the actual finding here, not a footnote to bury.
+
+Two things made this catchable instead of silent. First, I ran the calibration check before wiring the judge into anything that mattered, not after. If I had gone straight to "use the judge to auto-score every case," the eight-case calibration set would never have existed and the bad numbers would have looked authoritative. Second, I held the judge to the same bar as everything else in the project: no metric ships without a caveat, and a metric that fails its own sanity check does not get to ship at all.
+
+## The honest caveat, stated both ways
+
+Eight human ratings is a tiny calibration set, small enough that I would not generalize "LLM judges are unreliable for this task" beyond this specific setup. What I would generalize is the process: an LLM-as-judge is itself a model with its own error mode, and it needs the same held-out validation before you trust it that you would demand of the model it is judging. Skipping that step is how teams end up shipping a dashboard full of numbers nobody actually checked.
+
+## What I'd do differently
+
+If I rebuilt this today, I would collect the calibration set before writing a line of judge-prompt code, not after. I would also design the rubric around the specific failure modes that matter for these emails, missing specifics, wrong tone, burying the ask, rather than a generic "rate this 1 to 5" scale that gives the judge nowhere to be specific and nothing concrete to disagree with a human about.
+
+**Takeaways:** an LLM judge is a model, and models need held-out validation before you trust their scores, not after. When a validator fails its own check, the right move is to cut it from the eval and say so, not average it in and hope the noise cancels. The metric left standing here, 93.7% macro-F1 on a locked, synthetic n=16 split, is a smaller set of claims than "an AI judge said it's good," but every one of those claims is one I can actually defend.

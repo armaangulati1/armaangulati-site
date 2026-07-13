@@ -1,0 +1,101 @@
+---
+title: "Trust Marketplace"
+oneLiner: "A Medicaid referral platform connecting healthcare providers and community-based organizations, built from the first customer conversation to a live platform."
+role: "AI Developer, Trust.care"
+timeframe: "May 2024 to present"
+stack:
+  - "FastAPI"
+  - "Streamlit"
+  - "LangChain"
+  - "Chroma (original build)"
+  - "Pinecone (current, privacy-tiered embeddings)"
+  - "sentence-transformers (all-MiniLM-L6-v2)"
+  - "Tool-calling agents with identity/auth validation"
+tags:
+  - "healthcare"
+  - "agents"
+featured: true
+metrics:
+  - value: "5.12M+"
+    label: "Outreach messages processed"
+    qualifier: "platform total, Trust.care reporting"
+  - value: "19.2%"
+    label: "Cohort engagement"
+    qualifier: "~12.8x the published CHCS 1.5% Medicaid SMS benchmark, in a 63.8%-no-email cohort"
+  - value: "118.2K"
+    label: "Inbound replies classified"
+    qualifier: "reply-classification pipeline; ~36% separated as high-signal from noise"
+  - value: "35K+"
+    label: "Reported Medicaid enrollments and re-enrollments"
+    qualifier: "client-reported; 3,930 platform-validated enrollments (2024 attribution window)"
+links: {}
+diagram: "ReferralPlatformDiagram"
+tldr:
+  - "A production Medicaid referral platform built by a two-engineer team, embedded directly with providers and community organizations"
+  - "SMS-first because the cohort was 63.8% email-less; 19.2% cohort engagement, roughly 12.8x the published Medicaid SMS benchmark"
+  - "Contributed to 35,000+ reported Medicaid enrollments and re-enrollments"
+---
+
+## Problem
+
+Connecting Medicaid members to the community-based organizations (CBOs) that can actually help them, food assistance, housing support, transportation, was a fragmented, manual referral process run over phone calls and fax. Providers knew a member needed help; there was no scalable way to find the right CBO, reach the member, and confirm the referral actually landed. Trust Marketplace is the platform I helped build, as one of two engineers, to turn that manual process into deployed software, embedded directly with providers and CBOs from the first customer conversation onward.
+
+## Why it mattered
+
+This is the one project on this site where "production" is the right word, because it is one: a live platform, run by Trust.care, that a real Medicaid population uses today. It's also the project that taught me the lesson this whole site is built around: build next to the user, and design for the population you actually have, not the one you assumed you'd have.
+
+## Architecture
+
+- The outreach layer is SMS-first. A ~955K-member Medicaid cohort is reached primarily by text because 63.8% of that cohort has no email on file; text isn't a fallback channel here, it's the default.
+- A reply-classification pipeline sorts inbound replies by intent, affirmative interest, program questions, language requests, gratitude, wrong-number, and complaints, separating roughly 36% high-signal traffic from the rest so it doesn't get lost in the volume. It has classified 118.2K+ replies to date.
+- The matching engine originally ran on LangChain with Chroma for semantic similarity between member needs and CBO services. As the platform scaled, that layer moved to sentence-transformers (all-MiniLM-L6-v2) with direct cosine similarity, now 20% of the match score with no vector database in that path.
+- The knowledge layer runs separately: a RAG knowledge base on Pinecone (managed), with privacy-tiered embeddings so the embedding provider is chosen by data sensitivity, not convenience. Tier 1 (local-only) data embeds through a local Ollama BGE model that never leaves the boundary; Tiers 2 and 3 use sentence-transformers or OpenAI's ada-002. Retrieval blends vector and keyword search, default weighted 0.7/0.3, plus recency.
+- Tool-calling agents sit on top of both layers with an identity and auth validation layer, since actions here touch real member data and real CBO capacity, not a sandbox.
+- A vulnerability-scoring and stratification system concentrates outreach on the highest-need members rather than messaging the full cohort uniformly.
+- An analytics and reporting pipeline (co-built, partial credit) rolls results up for health-plan-partner and state (DHCS) reporting: federation-level rollups, outcome attribution, benchmark calibration.
+
+## Technical decisions
+
+**SMS-first instead of email-first outreach.** Alternative: default to email, the more common channel for outreach platforms. With 63.8% of the cohort lacking an email address, designing for the actual population meant text had to be the primary channel from the start, not an afterthought bolted onto an email-first design.
+
+**A reply-classification pipeline instead of a single autoresponder or an unsorted human queue.** Alternative: route every inbound reply to a human, or handle everything with one blanket autoresponder. At 118.2K+ replies, classification by intent is what makes the ~36% high-signal replies (real interest, real questions) findable instead of buried under gratitude messages and wrong numbers.
+
+**Migrating the matching engine off Chroma as the platform scaled.** Alternative: keep the original 2024 Chroma-based semantic matching indefinitely. The platform separated "match a member to a CBO" (sentence-transformers plus cosine similarity) from "answer a question against a knowledge base" (Pinecone) into two differently-tuned retrieval paths instead of one shared vector store trying to do both jobs.
+
+**Privacy-tiered embeddings instead of one embedding provider for everything.** Alternative: send all member text to a single external embeddings API for simplicity. Some tiers of data can't leave the boundary, so the embedding provider is selected per privacy tier, with a local Ollama model reserved for the most sensitive tier.
+
+**Vulnerability scoring to concentrate outreach instead of messaging everyone equally.** Alternative: blast the full cohort uniformly. Outreach capacity is finite, and the goal is to move an engagement rate for the members who need it most, not just a total message count, so stratification by need comes before anything else.
+
+## Interesting challenges
+
+Designing SMS-first for a 63.8%-no-email cohort was the defining constraint of the whole platform. It's an easy fact to state and an easy one to under-design around; almost every outreach tool defaults to email because that's the common case in most industries. Building for Medicaid meant treating the no-email majority as the primary case, not the edge case.
+
+Reply classification at 118K+ scale surfaced a second, quieter problem: distinguishing signal from noise isn't just an NLP task, it's a triage problem. A member replying "yes" needs to reach a person fast; a member replying "stop" needs to never be texted again; both look short and simple, and getting the intent taxonomy wrong in either direction has real consequences.
+
+Language equity was its own challenge: 37.6% of engagement comes from limited-English-proficiency members, roughly 2x California's 19.5% baseline (Pew), reaching 271K non-English members. Outreach that only works in English misses a large share of the population the platform exists to serve.
+
+## Results
+
+| Metric | Value | Qualifier |
+|---|---|---|
+| Outreach messages processed | 5.12M+ | platform total, Trust.care reporting |
+| Medicaid cohort reached | ~955K members | platform total |
+| Community-based organizations | 100+ | platform total |
+| Cohort engagement | 19.2% | ~12.8x the published CHCS 1.5% Medicaid SMS benchmark, in a 63.8%-no-email cohort |
+| Inbound replies classified | 118.2K+ | ~36% separated as high-signal from noise |
+| Reported enrollments and re-enrollments | 35K+ | client-reported; 3,930 platform-validated enrollments (2024 attribution window) |
+| Limited-English-proficiency engagement | 37.6% | ~2x California's 19.5% baseline (Pew); 271K non-English members reached |
+
+## Lessons
+
+Designing for the actual population's channel access mattered more than any model or architecture choice I made. SMS-first wasn't a nice-to-have; it was the difference between reaching most of the cohort and reaching a fraction of it.
+
+Migrating a retrieval architecture as a system scales is normal, and keeping the story straight, what I built originally versus what the platform runs on today, matters more than pretending nothing changed. I built the original Chroma-based matching; the platform later moved to Pinecone with privacy-tiered embeddings as it grew.
+
+A number that looks almost too good is usually measuring something narrower than it sounds like. I've held metrics back when I couldn't defend the denominator rather than publish a figure I'd have to walk back under questioning.
+
+## Future work
+
+- Close the loop between reply classification and vulnerability scoring so high-signal replies feed stratification in closer to real time.
+- Extend the privacy-tiered embedding approach across the full RAG layer as more data tiers come online.
+- Reconcile engagement-metric definitions so "engaged" means the same thing everywhere it is reported.

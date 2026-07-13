@@ -1,0 +1,108 @@
+---
+title: "Clinical Ops Copilot"
+oneLiner: "An agentic system that reads a patient's chart, checks it against payer rules, and prepares prior-authorization paperwork for a human to approve."
+role: "Solo builder"
+timeframe: "2026"
+stack:
+  - "Python"
+  - "Claude (claude-sonnet-4-5)"
+  - "MCP (Model Context Protocol)"
+  - "FastAPI + HTMX"
+  - "FHIR (HAPI, Synthea)"
+  - "X12 EDI"
+  - "Tesseract OCR"
+  - "Playwright"
+  - "Docker, Fly.io"
+  - "pytest, mypy strict, GitHub Actions"
+tags:
+  - "healthcare"
+  - "agents"
+  - "evals"
+  - "infra"
+featured: true
+metrics:
+  - value: "93.7%"
+    label: "Decision macro-F1"
+    qualifier: "n=16, locked held-out split, synthetic data"
+  - value: "16/16"
+    label: "X12 278 round-trip decision agreement"
+    qualifier: "self-consistency test on the locked split; measures ingestion fidelity, not clinical accuracy"
+  - value: "96/96"
+    label: "OCR field accuracy"
+    qualifier: "synthetic 12-letter eval, self-generated and self-scored"
+  - value: "188 / 215"
+    label: "Tests passing (CI-gated / total)"
+    qualifier: "188 CI-gated (excludes network, ocr, browser marks); 215 total including those"
+links:
+  github: "https://github.com/armaangulati1/clinical-ops-copilot"
+  loom: "https://www.loom.com/share/2368c0f132fa4d2e8960dac7682592ff"
+  api: "https://clinical-data-mcp.fly.dev/health"
+diagram: "AgentArchitectureDiagram"
+tldr:
+  - "An LLM agent that reads live FHIR data and free-text notes, checks payer policy, and recommends prior-auth decisions behind a human approval gate"
+  - "Deployed on Docker and Fly.io; 93.7% macro-F1 on a held-out set of synthetic cases; the LLM-as-judge failed its own validation and was cut from scoring"
+  - "A synthetic-data demo, not a production system, and it never claims to be one"
+---
+
+## Problem
+
+Before a pharmacy can fill many medications, clinic staff have to prove to the insurer that the patient meets its coverage criteria: digging through the chart, filling out forms, faxing documentation. The American Medical Association reports practices complete dozens of these prior-authorization requests per physician every week, and every delay or denial pushes back patient care. Most of the work is mechanical (find the A1C, confirm the patient tried metformin, check the BMI against the payer's checklist), but the mechanical part is exactly where careless automation is dangerous: a system that confidently guesses when it's unsure is worse than the manual process it replaces.
+
+## Why it mattered
+
+This is the project I built to answer the question a customer-facing AI role actually asks: can you build something that touches a real workflow, measure where it fails, and put a human in charge of every consequential action? It's a deployed, synthetic-data demo, not a production system, and I never call it one. But every layer, from live FHIR ingestion to the X12 wire format payers actually use, is built to the standard of "would I show a founder the failure modes, not just the demo."
+
+## Architecture
+
+- The Approval UI (FastAPI + HTMX) is the only place a state-changing action can originate. It talks to the Agent, which owns the planner, guardrails, and audit logging.
+- The Agent reaches two separate MCP servers: `clinical-data` (read-side: chart extraction, payer policy, FHIR client to HAPI FHIR and Synthea bundles, deployed on Fly.io over StreamableHTTP with bearer auth) and `clinic-ops` (action-side: send_email, create_task, run locally over stdio).
+- A deterministic guardrail sits between the planner and the approval queue. If a required field is null or `needs_review`, the case is forced to request-more-info regardless of what the model would have guessed.
+- The human approval gate is the last stop before anything leaves the system. No email is sent and no task is created until a staff member reviews it in the UI.
+- The X12 278 layer sits at the payer-format edge: a hand-rolled parser reads an inbound 278 REQUEST into the agent's existing `Case` input, and a generator emits a 278 RESPONSE from the agent's decision (submit → A1, request-more-info or deny-risk → A4, never A3).
+- OCR intake and a Playwright browser agent sit at the two intake/egress edges a deployment engineer actually touches: reading scanned decision letters, and reading authorization status back out of a payer portal (a self-built, clearly-labeled synthetic portal).
+
+## Technical decisions
+
+**Two MCP servers instead of one.** Alternative: a single MCP server handling both reads and actions. I split them because reads and actions have different trust boundaries: the read-side (`clinical-data`) can deploy publicly on Fly.io, while every action-side call has to pass the human gate first. Keeping them separate made that boundary structural instead of a rule I had to remember to enforce in code.
+
+**A deterministic guardrail on top of the model's own judgment.** Alternative: trust the planner's prompting to ask for missing fields on its own. The pre-fix baseline had deny-risk recall of 0.600, meaning the model missed two out of five real denial risks. Adding a guardrail that routes any case with a null required field to request-more-info, independent of what the model would have said, is what moved that recall to 1.000.
+
+**Built an LLM-as-judge, then excluded it.** Alternative: keep the judge in the scoring pipeline like most eval setups do. I validated it against 8 human ratings first: 0% exact agreement, MAE 1.38, and a Pearson correlation of about -0.29, meaning it disagreed with humans more often than chance would predict. I excluded it entirely rather than quietly blending a broken score into the eval.
+
+**The X12 278 response generator simulates the payer side rather than claiming to be one.** Alternative: only build the request-parsing half and skip the response. Without generating a response there's no way to close the loop and test decision agreement, but claiming the agent issues real utilization-review determinations would misrepresent the demo. The response generator is explicitly framed as a simulation of what a payer-side determination would look like given the agent's own assessment.
+
+**Chaos-tested idempotency before adding more automation.** Alternative: assume retries are safe by default. Under 30% injected failure, I verified 40/40 idempotent `send_email` calls produced exactly 40 backend sends (no doubles) and 20/20 action bundles completed once per key, closing the double-send failure mode before building anything else on top of the action layer.
+
+## Interesting challenges
+
+The centerpiece failure is the LLM-as-judge. It's a common pattern to add a model-graded score to an eval pipeline, and it's tempting to trust it because it looks like more signal. When I checked it against 8 human ratings, it didn't just fail to agree, it correlated negatively with human judgment. I excluded it from scoring and kept the locked, human-labeled eval as the only source of truth. That's the honest-evals story I'd tell in an interview before anyone asks.
+
+The `deny-risk` to A4 mapping was a smaller but deliberate decision: the automated layer never issues an A3 (denied). A likely-denial flag is pended for human review, not adjudicated, because only a human downstream has the authority to deny. On the locked eval split, the offline decider produced 12 submit and 4 request-more-info cases and zero deny-risk cases, so that specific mapping is covered by unit tests, not by the held-out eval; I disclose that gap rather than let the 16/16 number imply more than it measures.
+
+The OCR layer's honest surprise: raw tesseract genuinely garbles degraded scans (on one letter, "Case ID" reads as "Case 1D"), and the tolerant parser recovers the field anyway through case-insensitive matching and light noise remapping. The 96/96 field accuracy is real, but it's 100% on a 12-letter set I generated and scored myself, not a claim about real payer letters.
+
+## Results
+
+| Metric | Value | Qualifier |
+|---|---|---|
+| Decision macro-F1 | 93.7% | n=16, locked held-out split, synthetic data |
+| Deny-risk recall | 1.000 | was 0.600 pre-guardrail-fix |
+| FHIR-fusion macro-F1 vs note-only | 1.0000 vs 0.2456 | n=12 Ozempic/T2D synthetic Synthea cases, decision-logic eval |
+| X12 278 round-trip decision agreement | 16/16 (100%) | self-consistency test; ingestion fidelity only, exercises submit and request-more-info classes only |
+| OCR field accuracy | 96/96 | synthetic 12-letter eval, self-generated and self-scored |
+| Chaos test (30% injected failure) | 40/40 idempotent sends, 20/20 action bundles | no double-sends, no duplicate completions |
+| Tests | 188 CI-gated / 215 total | non-network/ocr/browser gate vs full suite incl. tool-marked tests |
+
+## Lessons
+
+I would have shipped a broken scorer if I hadn't validated the judge against real human ratings before trusting it. Now I check any model-graded metric against a small human-labeled sample before it goes anywhere near a scoreboard.
+
+Guardrails need to be deterministic when the failure mode is a missed field, not just a well-prompted model. The recall jump from 0.600 to 1.000 came from code, not a better prompt.
+
+Simulating both sides of a protocol (parsing the request, generating the response) taught me how easy it is to accidentally overclaim what a demo does. Framing the response generator as a simulation, explicitly, was the difference between an honest artifact and a misleading one.
+
+## Future work
+
+- Grow the locked eval split past n=16 for tighter confidence intervals on the decision metrics.
+- Exercise the deny-risk to A4 mapping in the held-out eval itself, not only in unit tests.
+- Test the X12 278 layer against a real clearinghouse sandbox instead of only a self-consistency round-trip.

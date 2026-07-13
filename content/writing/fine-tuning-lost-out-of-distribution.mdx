@@ -1,0 +1,38 @@
+---
+title: "Fine-Tuning Won In-Distribution and Lost Out-of-Distribution"
+date: 2026-07-14
+summary: "A controlled LoRA fine-tuning experiment beat the prompted pipeline on synthetic data and lost to it, and to the untuned base model, on real notes."
+tags: ["fine-tuning", "evals", "llm", "healthcare-ai", "lora"]
+---
+
+ChartExtractor turns a doctor's free-text oncology note into eight structured fields: primary site, histology, stage, ECOG status, biomarkers, diagnosis date, line of therapy, and treatment regimen. The prompted pipeline, a router, four grouped extractors, a validator, and a verifier, scores 93.6% macro-F1 on its 6-note CI gold set, the synthetic evaluation set that gates every deploy. Across the full 250-note gold-labeled corpus (200 synthetic, 50 real hand-labeled transcripts from MTSamples), real-note macro-F1 is 53.8%, a roughly 40-point gap between synthetic and real that the project discloses as a headline number, not a footnote.
+
+The natural next question, the one that comes up in almost every interview about this project, is whether fine-tuning closes that gap. Prompting a general model is cheap to iterate on; fine-tuning is supposed to bake task-specific behavior directly into the weights instead of asking for it at inference time. So I ran the experiment instead of guessing at the answer.
+
+## The setup
+
+I LoRA fine-tuned Qwen2.5-7B-Instruct-4bit using MLX on an M3 Max: 8 tuned layers, 5.77M trainable parameters, 300 iterations over 179 training examples. The training pool was 194 synthetic notes, the 200-note synthetic set minus the six notes that also appear in CI gold, and the held-out test set was the 50 real MTSamples notes plus those 6 CI gold notes, none of which the model ever saw during training, split 179 train and 15 validation. That clean split is the whole point of the experiment. Without it, any in-distribution win is just memorization dressed up as generalization, and it would tell me nothing about whether fine-tuning helps on notes that look like the real thing.
+
+## In-distribution, fine-tuning won clearly
+
+Scored on the same CI gold set, the fine-tuned model hit 99.3% macro-F1, beating the prompted pipeline's recorded 93.6% on that same synthetic set. If the writeup stopped here, the story would be "fine-tuning wins," and that is the story a lot of fine-tuning writeups tell, because they stop here.
+
+## Out-of-distribution, fine-tuning lost, badly
+
+On the 50 real notes, the fine-tuned model scored 29.8% macro-F1. The prompted pipeline's recorded number on the same real notes is 53.8%. The untuned base model, with no fine-tuning at all, scored 48.0%. Fine-tuning made the model worse than doing nothing: about 18 points worse than the untuned base on the data that actually resembles what a clinician writes.
+
+The error taxonomy explains why. The dominant failure on real notes was hallucinated over-extraction on sparse notes: the fine-tuned model produced a confident value for fields the note simply didn't support, instead of leaving them blank. The prompted pipeline's verifier step is built to catch exactly this and route low-confidence fields to human review; the fine-tuned model never learned that behavior, because none of its 179 training examples were labeled "I don't know." Two of the 50 real-note runs failed to parse at all, and those were scored honestly as empty extractions rather than dropped from the denominator, which is the harsher and more correct way to count a failure.
+
+## What this isolates
+
+The comparison points at abstention and distribution shift as the actual bottleneck, not raw model capability. Fine-tuning on a small, clean, synthetic training set optimized the model into confidently reproducing the patterns of that set, and it stripped out the "ask instead of guessing" behavior the prompted pipeline's verifier had been explicitly engineered to enforce. A model that memorizes 179 examples well is not the same as a model that knows when it is out of its depth.
+
+## Caveats, stated plainly
+
+This is a single run with one seed, not a sweep. The real evaluation set is 50 notes, small enough that a handful of different answers would move the percentage meaningfully. The fine-tune-versus-pipeline comparison uses the pipeline's already-recorded numbers on the same evaluation sets rather than a fresh, simultaneous re-run; the base-versus-fine-tune comparison, by contrast, is an exact same-run, same-data comparison and is the more apples-to-apples half of this result. None of this is a claim about fine-tuning at scale, hyperparameter sweeps, or a fine-tuned model anyone would actually deploy.
+
+## What I'd do differently
+
+I would build abstention directly into the training data instead of hoping it emerges: label a portion of examples with explicit nulls and penalize a confident wrong answer more than an honest blank. I would run more than one seed before trusting any single percentage. And I would grow the real-note set past 50 before treating any out-of-distribution number as more than directional. The honest version of "does fine-tuning help" turned out to be "it depends entirely on whether your test distribution matches your training distribution," which is a less exciting sentence than "fine-tuning improved accuracy," but it is the one that is actually true here.
+
+**Takeaways:** fine-tuning is not a substitute for solving distribution shift; in this experiment it amplified the underlying problem instead of fixing it. A model can look strictly better on the metric you optimized for and strictly worse on the population you actually care about, which is exactly why in-distribution and out-of-distribution numbers have to be reported side by side, never one without the other.

@@ -1,0 +1,34 @@
+---
+title: "What a 63.8% No-Email Cohort Taught Me About Building for Medicaid"
+date: 2026-07-14
+summary: "A majority of the Medicaid cohort had no email on file, so the product had to be built SMS-first from day one instead of email-first with a fallback."
+tags: ["healthcare-ai", "medicaid", "product-design", "sms"]
+---
+
+Trust Marketplace is an AI-powered referral platform connecting healthcare providers with community-based organizations (CBOs) so Medicaid members actually get connected to the services a doctor refers them to: housing help, food assistance, transportation, the kind of social-needs referrals that determine whether a medical treatment plan survives contact with someone's actual life. I was one of two engineers who built it from the ground up, embedded directly with providers and CBOs instead of building in isolation and shipping it over the wall.
+
+The production platform has processed more than 5.12 million outreach messages to a Medicaid cohort of roughly 955,000 members, working with 100+ CBOs (the platform's all-time total; one case-study deck's cohort snapshot shows 34 CBOs active in that particular slice, a smaller point-in-time view of the same relationship). Somewhere early in scoping the outreach channel, one number reframed the entire technical design: 63.8% of the cohort had no email address on file.
+
+## Designing for the cohort you actually have
+
+Most outreach software defaults to email because it is the cheapest channel to build for and the easiest to reason about: templates, threading, unsubscribe links, all solved problems. For a majority-no-email population, defaulting to email does not mean "slightly worse reach." It means the majority of the people the platform exists to serve are unreachable by the primary channel on day one.
+
+So the platform is SMS-first, not email-with-an-SMS-fallback. That is a real architectural difference, not a copy change. SMS has a short-message mental model, no threading UI to lean on, minimal formatting, and a much higher expectation of an immediate, conversational reply. Every piece of outreach copy, every branching flow, and every downstream classification system had to be built around a channel where the member is the one texting back, on their own time, in their own words. We also built a vulnerability-scoring system that stratifies the cohort by need and concentrates outreach on the members who need it most, rather than treating every member as an equal-priority send.
+
+That listening half of the design turned out to matter more than the outbound half. The platform has classified more than 118,200 inbound replies by intent: affirmative interest, program questions, language requests, gratitude, wrong numbers, complaints, separating the roughly 36% that carry real signal from the noise. An SMS-first platform is not just a cheaper way to reach more people. It is a platform that has to listen back, because the whole value of the channel is that people actually respond in it.
+
+## The number that says the design choice worked
+
+The design choice can be checked against a real benchmark. Cohort engagement on the platform is 19.2%, against a published Center for Health Care Strategies (CHCS) benchmark of 1.5% for Medicaid SMS outreach generally, roughly 12.8 times higher. That comparison is exactly the kind of number I want to be careful with in public: it is one platform's engagement rate against one published external benchmark, not a controlled study with matched populations and a shared time window on both sides. I would rather state it with that caveat than let the multiple do the talking by itself.
+
+Language access told a similar story. 37.6% of limited-English-proficiency (LEP) members engaged with outreach, versus California's published baseline of roughly 19.5% (Pew Research), about double, with the same caveat as the engagement multiple: one platform's rate against a published external baseline, not a matched controlled comparison. The platform reached 271,000 non-English-speaking members in the process. Building for a channel that does not assume everyone reads a long English-language email, and pairing it with reply classification that can route a language-preference request into an actual response, moved a number a lot of health outreach programs treat as a permanent ceiling.
+
+## What this generalizes to
+
+The lesson is not "use SMS." It is that the default assumptions baked into most software, an email address on file, majority English fluency, a member who reads outreach on a laptop, are demographic choices, not neutral engineering defaults. They quietly design out the population with the least existing access to care, which for a Medicaid platform is close to the entire point of the product. "Design for the actual population" sounds obvious written down. In practice it meant rebuilding the outreach and classification stack around a channel that was harder to build for, because the easier channel would have been invisible to most of the people it needed to reach.
+
+## What I'd do differently
+
+Two years in, the thing I would push harder on earlier is measurement discipline on the outcome side, not just the engagement side. Engagement numbers like 19.2% and 37.6% are easier to instrument than downstream outcomes, and it is tempting to let a strong engagement number stand in for proof of impact on its own. The platform tracks 35,000+ client-reported Medicaid enrollments and re-enrollments, and I would want that reporting pipeline instrumented with the same rigor from day one that the engagement metrics got, instead of building that discipline in gradually.
+
+**Takeaways:** the channel you default to is a decision about who gets left out, not just a technical convenience. A benchmark comparison is only as honest as the caveat sitting next to it, so state the caveat every time you cite the multiple. For a Medicaid platform, the population the defaults quietly design out is exactly the one the product exists to serve.

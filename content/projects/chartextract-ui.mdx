@@ -1,0 +1,93 @@
+---
+title: "ChartExtract-UI"
+oneLiner: "A single-screen human-in-the-loop console for reviewing, correcting, and approving what an extraction model pulled from a clinical note."
+role: "Solo builder"
+timeframe: "July 2026 (one-day build)"
+stack:
+  - "React 18 (JavaScript, JSX, no TypeScript)"
+  - "Vite"
+  - "Vitest, React Testing Library"
+  - "ESLint (flat config), Prettier"
+  - "GitHub Actions (CI + Pages deploy)"
+tags:
+  - "frontend"
+  - "healthcare"
+featured: false
+metrics:
+  - value: "55"
+    label: "Tests passing"
+    qualifier: "Vitest + React Testing Library, CI-gated on every push"
+  - value: "0.75 / 0.90"
+    label: "Review-threshold defaults, live vs demo mode"
+    qualifier: "live matches the API's server default; demo raised because fixture confidences cluster around 0.85"
+  - value: "1 day"
+    label: "Build time"
+    qualifier: "time-boxed scope, disclosed in the README"
+links:
+  github: "https://github.com/armaangulati1/ChartExtract-UI"
+  demo: "https://armaangulati1.github.io/ChartExtract-UI/"
+diagram: "ReviewConsoleDiagram"
+tldr:
+  - "A React review console for human-in-the-loop verification of the extraction API"
+  - "Per-field confidence with threshold routing identical to the server rule, and evidence-quote provenance on every value"
+  - "Five bundled synthetic notes; 55 tests and CI; a time-boxed project, not a medical device"
+---
+
+## Problem
+
+ChartExtractor pulls structured oncology fields out of a clinical note, but a model that flags its own uncertainty is only useful if a human can act on that signal quickly. Someone needs to see each field's value, its confidence, and the exact quote in the note that supports it, then approve or correct it, without wading through raw JSON. That's the surface this project builds.
+
+## Why it mattered
+
+This is the reinforcement project behind my JavaScript and React work: a real, tested, human-in-the-loop console built on top of a live API, not a tutorial project. It's also the other half of the ChartExtractor story. A pipeline that measures its own uncertainty is only as good as the review surface built on top of it, and this is that surface.
+
+## Architecture
+
+- Two data sources feed the exact same `ExtractionOutput` shape, so the rest of the app never has to know which one ran. Demo mode (`lib/demo.js`) replays fixture JSON captured from five bundled synthetic notes. Live mode (`lib/api.js`) calls the real ChartExtractor API's `POST /extract` with `fetch` and an `AbortController` timeout, normalizing every failure mode (non-200, timeout, network error, bad JSON) into a single `ApiError`.
+- A single `reviewReducer` owns the whole session: the active mode, the review threshold, the selected note, request status, the current extraction result, and a per-field review map of `pending`, `approved`, or `corrected`.
+- `selectOrderedFields` sorts needs-review fields to the top; `ResultsPanel` renders one `FieldCard` per field with its value, a confidence bar, the source quote, and any validator flags. Hovering a card highlights the supporting quote inside the note text.
+- Needs-review routing happens two ways depending on mode: server-side in live mode (the API computes `confidence < review_threshold`), and client-side in demo mode (`lib/routing.js` reapplies that same rule against the fixture's fixed confidences, so the slider still feels live without a network call).
+- Approve and correct actions update the review map; `buildCorrectionExport` turns the final review state into a downloadable gold-label JSON file.
+
+## Technical decisions
+
+**Demo mode as the default instead of always requiring the live API.** Alternative: force every session through the live API. The free-tier Render backend cold-starts in around 45 seconds, so demo mode replays real, previously captured API responses instead of live-calling on load. The console is instantly usable, and the fixtures are curled real outputs, not invented ones.
+
+**Client-side threshold re-routing in demo mode instead of disabling the slider there.** Alternative: only support the threshold slider in live mode, since demo fixtures have fixed confidences. `applyThreshold` reapplies the exact same `confidence < threshold` rule the server uses, so the slider stays interactive and honest in both modes without needing a network round trip in demo mode.
+
+**Plain JavaScript and JSX, no TypeScript.** Alternative: TypeScript, the more common choice for a data-shaped review UI like this one. This was a deliberate one-day scope choice to reinforce plain JS/React fluency directly. The README lists a TypeScript migration under future work, not as something I missed.
+
+**Guarding demo mode against arbitrary pasted notes.** Alternative: let demo mode accept any pasted text and return the nearest matching fixture. Pairing an arbitrary note with a canned response would be dishonest and would corrupt any gold-label export built from it, so the paste box is disabled in demo mode, and `extractDemo` throws if it's ever asked to resolve an unknown note id, as a last line of defense behind the UI guard.
+
+**A single `useReducer` instead of a state library or several `useState` hooks.** Alternative: pull in Redux or Zustand, or scatter local state across components. The whole workflow (extract, approve, correct, reset a field, reset the whole review, re-route on a new threshold) reduces to a handful of pure actions and selectors, which made it unit-testable without rendering React and was the right size for a one-screen app.
+
+## Interesting challenges
+
+Confidence-threshold routing across two modes was the trickiest consistency problem. The API decides `needs_review` server-side in live mode; demo mode has no server round-trip to lean on, so it has to reimplement the identical rule client-side. Getting that duplication right, rather than approximating it, is what makes the demo slider trustworthy instead of just decorative.
+
+Evidence provenance, the hover-to-highlight quote inside the note, is a small feature that does a lot of trust-building work. A confidence number alone tells a reviewer nothing about why the model is unsure; the supporting quote lets them check the model's reasoning against the actual text in seconds.
+
+The honesty guard on demo-mode pasted notes was a smaller decision with an outsized consequence if I'd skipped it. Letting a pasted note silently return a canned fixture response would look like a working feature while actually producing meaningless gold-label exports. Disabling the input and throwing on an unresolved note id was the deliberate, less-impressive-looking choice.
+
+## Results
+
+| Metric | Value | Qualifier |
+|---|---|---|
+| Tests passing | 55 | Vitest + React Testing Library, CI-gated on every push |
+| Review-threshold defaults | 0.75 (live) / 0.90 (demo) | live matches the API's server default; demo raised because fixture confidences cluster around 0.85 |
+| Build time | 1 day | time-boxed scope, disclosed in the README |
+| Bundled demo notes | 5 | fixtures captured verbatim from the live API; values vary slightly per run since the pipeline is LLM-backed |
+
+## Lessons
+
+Two data sources returning the same shape is what let the rest of the app not care which one ran. That one discipline, one shape, two adapters, is what made dual-mode both possible and actually testable.
+
+A demo mode that returns canned data for anything you type is a trap. I'd rather show an honest "this needs Live API" message than fake an answer that looks fine and corrupts every export built from it.
+
+Forcing every state transition into a single reducer made me name each one explicitly up front (resetting one field is not the same action as resetting the whole review), which caught edge cases before they became bugs instead of after.
+
+## Future work
+
+- Migrate to TypeScript for stronger schema typing at the API boundary.
+- Add a `/history` browser backed by the API's existing history endpoint.
+- Aggregate exported corrections into a real evaluation set and measure model accuracy against reviewer decisions over time.

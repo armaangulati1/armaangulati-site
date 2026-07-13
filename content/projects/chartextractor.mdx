@@ -1,0 +1,103 @@
+---
+title: "ChartExtractor"
+oneLiner: "Turns a doctor's free-text oncology note into a structured record, and tells you exactly where it isn't sure."
+role: "Solo builder"
+timeframe: "2026"
+stack:
+  - "Python"
+  - "OpenAI (gpt-4o, gpt-4o-mini)"
+  - "FastAPI"
+  - "Streamlit"
+  - "Langfuse"
+  - "Docker"
+  - "MLX (LoRA fine-tuning)"
+  - "Kubernetes (EKS), AWS ECR"
+  - "GitHub Actions"
+tags:
+  - "healthcare"
+  - "evals"
+  - "infra"
+featured: true
+metrics:
+  - value: "93.6%"
+    label: "Macro-F1, CI gold set"
+    qualifier: "6-note synthetic CI gold set, deploy gate at 85%"
+  - value: "53.8%"
+    label: "Macro-F1, real notes"
+    qualifier: "50 hand-labeled MTSamples notes; ~40-point gap vs synthetic, disclosed publicly"
+  - value: "99.3%"
+    label: "LoRA fine-tune macro-F1, in-distribution"
+    qualifier: "CI gold set, single run, clean train/test split"
+  - value: "29.8%"
+    label: "LoRA fine-tune macro-F1, out-of-distribution"
+    qualifier: "real notes; vs 48.0% untuned base and 53.8% prompted pipeline, single run, n=50"
+links:
+  github: "https://github.com/armaangulati1/chartextract"
+  demo: "https://chartextract-f9wfrftqzygappf2pgi3hts.streamlit.app/"
+  api: "https://chartextract.onrender.com/docs"
+diagram: "ExtractionPipelineDiagram"
+tldr:
+  - "An agentic extraction pipeline pulling structured oncology variables from clinical notes; 93.6% macro-F1 on its evaluation set against a CI gate of at least 85%"
+  - "The headline finding is the 40-point synthetic-to-real accuracy gap, published rather than hidden"
+  - "Includes a controlled LoRA fine-tune that won in-distribution and lost out-of-distribution"
+---
+
+## Problem
+
+Cancer care, clinical trials, and national cancer registries all run on structured chart data: primary site, stage, biomarkers, line of therapy, treatment regimen. Today most of it is produced by trained abstractors reading notes and keying in fields by hand, which is slow, expensive, and hard to audit. An extraction model that confidently guesses when it's wrong is dangerous in this setting, so the hard part isn't calling an LLM once. It's measuring per-field accuracy, catching normalization drift (colon vs. colorectal, FOLFIRI vs. its component drugs), and knowing when not to trust the model on a real consult transcript.
+
+## Why it mattered
+
+ChartExtractor is the project I use to make the case that I evaluate honestly rather than ship a demo and call it done. The headline number here isn't the accuracy on the easy set; it's the 40-point gap between that number and real notes, published in the README rather than left out of it. That gap, and the LoRA experiment built on top of it, is the clearest evidence I have that I know how to find where a system breaks, not just where it works.
+
+## Architecture
+
+- A clinical note enters through a Router, which fans out to four grouped extractors: tumor, clinical, molecular, and treatment.
+- Each extractor returns typed fields with a confidence score; a Validator checks types and enums, then a Verifier pass re-checks the combined extraction.
+- The Verifier produces three outputs: the final `OncologyExtract` record, per-field confidence, and `needs_review` flags for anything below the review threshold.
+- Downstream surfaces all read the same extract: the FastAPI `/extract` endpoint, the Streamlit review UI, the `eval.py` harness, and `batch.py` for folder-level throughput runs.
+- Every extraction call is wrapped in a Langfuse `@observe`, so latency and token cost are tracked per note rather than only in aggregate.
+- An optional `to_fhir()` step turns the extract into a FHIR R4 Bundle for EHR-shaped downstream consumption.
+
+## Technical decisions
+
+**Router plus grouped extractors instead of one single-pass prompt.** Alternative: a single large prompt per note (`single_pass`). In a controlled 4-config experiment, the pipeline-plus-verifier design beat single-pass on stage (66.7% to 100%, +33.3pp) even though it cost -1.1pp on overall macro-F1 (94.8% vs 95.8%). I kept the pipeline because stage is one of the highest-stakes fields clinically, and I'd rather trade a little aggregate accuracy for a large gain on the field that matters most.
+
+**Kept the verifier despite a documented net cost on some fields.** Alternative: drop it, since it introduces 7 new errors (splitting FOLFIRI into component drugs, dropping low-signal biomarkers like PSA). I kept it because it fixed the specific stage-substage confusion the extractors got wrong on their own, and I report both effects in the README rather than hiding the tradeoff.
+
+**Per-field evaluation with an explicit error taxonomy instead of one blended accuracy number.** Alternative: report a single pass/fail score. The taxonomy (hallucinated, missed, wrong_value, wrong_span, normalization) is what actually explains the real-vs-synthetic gap: on real notes, 60.7% of errors are hallucinations, meaning the model extracted a value where gold was null. A single number would hide that this is mostly an abstention problem, not a comprehension problem.
+
+**Deploy gate on the 6-note CI gold set, not the full real+synthetic corpus.** Alternative: gate on the harder real-note metric. The CI gold set is fast enough to run on every commit; the full 250-note corpus (200 synthetic, 50 real MTSamples) is the honest-disclosure layer that runs separately. Conflating the two would make CI either too slow or too generous.
+
+**Clean train/test split for the LoRA experiment.** Alternative: fine-tune on everything available, including the CI gold set. I trained on the 200 synthetic gold notes minus the 6 CI-gold ids, 194 notes split 179 train and 15 validation, and held out the 50 real MTSamples plus 6 CI-gold notes entirely, so neither the in-distribution nor out-of-distribution number is contaminated by the fine-tune having seen its own test data.
+
+## Interesting challenges
+
+The 40-point synthetic-to-real gap is the finding I'd lead with, not bury. The 6-note CI gate passes easily at 93.6%; the same pipeline drops to 53.8% macro-F1 on 50 real MTSamples notes, and I disclose that gap in the same README that reports the headline number.
+
+The LoRA experiment is the sharpest version of that lesson. I fine-tuned Qwen2.5-7B-Instruct-4bit with LoRA (MLX, on an M3 Max; 8 layers, 5.77M trainable params, 300 iterations over 179 training examples) on the gold-labeled extraction data. In-distribution, it won clearly: 99.3% macro-F1 on the CI gold set, beating the prompted pipeline's 93.6%. Out-of-distribution, it lost badly: 29.8% macro-F1 on real notes, against 48.0% for the untuned base model and 53.8% for the prompted pipeline, an 18-point drop below the base model it started from. The dominant failure was hallucinated over-extraction on sparse notes; the fine-tuned model never learned to abstain the way the prompted pipeline does. This is a single run on a small real test set (n=50), and I state that caveat every time the specific numbers come up.
+
+## Results
+
+| Metric | Value | Qualifier |
+|---|---|---|
+| Macro-F1, CI gold set | 93.6% | 6-note synthetic set, gate ≥85% |
+| Macro-F1, real notes | 53.8% | 50 hand-labeled MTSamples, ~40-point gap vs synthetic, disclosed |
+| Stage F1, pipeline+verifier vs single-pass | +33.3pp | controlled 4-config experiment, same 6-note gold set |
+| LoRA fine-tune macro-F1, in-distribution | 99.3% | CI gold set, single run, clean split |
+| LoRA fine-tune macro-F1, real notes | 29.8% | vs 48.0% base and 53.8% prompted pipeline; single run, n=50 |
+| Share of real-note errors that are hallucinations | 60.7% | real-note error taxonomy, 50 MTSamples notes |
+
+## Lessons
+
+A model can win in-distribution and lose badly out-of-distribution, and the only way I found that out was by holding out a real, unseen test set instead of trusting the CI gold number.
+
+Fixing one field can quietly cost others. The verifier improved stage but hurt regimen and biomarkers; I now report per-field deltas whenever I change the pipeline, not just a macro average.
+
+Abstention is a separate skill from accuracy. Most of the real-note errors are the model guessing when gold is null, which a single macro-F1 number doesn't distinguish from a genuinely wrong guess.
+
+## Future work
+
+- Expand real-note gold labeling before trusting any metric past the CI gold set.
+- Add abstention-aware scoring that separates null-vs-guess errors from wrong-value errors.
+- Add a canonical regimen lexicon at extraction time, not just at scoring time, to stop the verifier from splitting combo names like FOLFIRI into component drugs.
