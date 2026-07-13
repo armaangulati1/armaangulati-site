@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Light palette (spec §7). Dark is the default theme, applied via next-themes .dark class. */
+:root {
+  --radius: 0.625rem;
+
+  --background: #ffffff;
+  --foreground: #14171c;
+  --card: #f7f8fa;
+  --card-foreground: #14171c;
+  --popover: #ffffff;
+  --popover-foreground: #14171c;
+  --primary: #1f3864;
+  --primary-foreground: #ffffff;
+  --secondary: #f7f8fa;
+  --secondary-foreground: #14171c;
+  --muted: #f7f8fa;
+  --muted-foreground: #5a6472;
+  --accent: #edf1f9;
+  --accent-foreground: #14171c;
+  --destructive: #d9a03f;
+  --border: #e5e8ed;
+  --input: #e5e8ed;
+  --ring: #1f3864;
+
+  --brand: #1f3864;
+  --brand-soft: #edf1f9;
+  --success: #3fb27f;
+  --warn: #d9a03f;
+}
+
+/* Dark palette (spec §7), default. */
+.dark {
+  --background: #0a0c10;
+  --foreground: #e7eaf0;
+  --card: #11141a;
+  --card-foreground: #e7eaf0;
+  --popover: #11141a;
+  --popover-foreground: #e7eaf0;
+  --primary: #5b8def;
+  --primary-foreground: #0a0c10;
+  --secondary: #11141a;
+  --secondary-foreground: #e7eaf0;
+  --muted: #11141a;
+  --muted-foreground: #8b93a1;
+  --accent: #1a2438;
+  --accent-foreground: #e7eaf0;
+  --destructive: #d9a03f;
+  --border: #1f242e;
+  --input: #1f242e;
+  --ring: #5b8def;
+
+  --brand: #5b8def;
+  --brand-soft: #1a2438;
+  --success: #3fb27f;
+  --warn: #d9a03f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-success: var(--success);
+  --color-warn: var(--warn);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss01";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Visible focus ring: accent, 2px offset (spec §14). */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+/* prefers-reduced-motion: kill all motion globally (spec §9/§14). */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.text-metric {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
