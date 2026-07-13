@@ -5,11 +5,21 @@ import { screenshots } from "@/lib/screenshots";
 import { SectionLabel } from "@/components/tag";
 import { ProjectExplorer } from "@/components/sections/project-explorer";
 import type { IndexCard } from "@/components/sections/project-index-card";
+import { ogImage } from "@/lib/seo";
+
+const description =
+  "Healthcare-AI systems built and evaluated by Armaan Gulati, with honest metrics and disclosed limitations.";
 
 export const metadata: Metadata = {
   title: "Projects",
-  description:
-    "Healthcare-AI systems built and evaluated by Armaan Gulati, with honest metrics and disclosed limitations.",
+  description,
+  alternates: { canonical: "/projects" },
+  openGraph: {
+    title: "Projects",
+    description,
+    url: "/projects",
+    images: ogImage({ title: "Projects", subtitle: description }),
+  },
 };
 
 // clinical-rag has no case study at launch: a light card marked "write-up

@@ -3,11 +3,10 @@ export function AGLogo({ className }: { className?: string }) {
     <svg
       viewBox="0 0 32 32"
       className={className}
-      role="img"
-      aria-label="Armaan Gulati monogram"
+      aria-hidden="true"
+      focusable="false"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <title>Armaan Gulati</title>
       <rect
         x="1.5"
         y="1.5"

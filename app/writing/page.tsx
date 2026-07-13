@@ -6,11 +6,21 @@ import { getAllPosts } from "@/lib/mdx";
 import { formatDate } from "@/lib/utils";
 import { SectionLabel, Tag } from "@/components/tag";
 import { AnimatedSection, AnimatedItem } from "@/components/animated-section";
+import { ogImage } from "@/lib/seo";
+
+const description =
+  "Notes on honest evaluation, healthcare AI, and forward-deployed engineering by Armaan Gulati.";
 
 export const metadata: Metadata = {
   title: "Writing",
-  description:
-    "Notes on honest evaluation, healthcare AI, and forward-deployed engineering by Armaan Gulati.",
+  description,
+  alternates: { canonical: "/writing" },
+  openGraph: {
+    title: "Writing",
+    description,
+    url: "/writing",
+    images: ogImage({ title: "Writing", subtitle: description }),
+  },
 };
 
 export default function WritingPage() {
@@ -18,19 +28,19 @@ export default function WritingPage() {
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-      <AnimatedSection>
-        <AnimatedItem>
-          <SectionLabel>Writing</SectionLabel>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            Writing
-          </h1>
-          <p className="mt-4 max-w-[60ch] text-lg leading-[1.65] text-muted-foreground">
-            Short pieces on honest evaluation and building AI for the population
-            you actually have. Each one comes out of a project on this site, and
-            each leads with what didn&apos;t work.
-          </p>
-        </AnimatedItem>
+      {/* Header renders statically (it is the LCP element on this route);
+          the list below keeps its scroll-in entrance. */}
+      <SectionLabel>Writing</SectionLabel>
+      <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+        Writing
+      </h1>
+      <p className="mt-4 max-w-[60ch] text-lg leading-[1.65] text-muted-foreground">
+        Short pieces on honest evaluation and building AI for the population you
+        actually have. Each one comes out of a project on this site, and each
+        leads with what didn&apos;t work.
+      </p>
 
+      <AnimatedSection>
         <ul className="mt-10 divide-y divide-border border-y border-border">
           {posts.map((post) => (
             <li key={post.slug}>

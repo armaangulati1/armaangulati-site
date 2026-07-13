@@ -58,7 +58,8 @@ export function Footer() {
 
       <div className="mx-auto max-w-5xl px-4 pb-10 sm:px-6">
         <p className="text-xs text-muted-foreground">
-          Built with Next.js. No third-party trackers.
+          Built with Next.js. No trackers beyond privacy-safe, cookieless page
+          counts.
         </p>
       </div>
     </footer>

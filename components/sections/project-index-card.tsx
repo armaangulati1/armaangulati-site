@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
 import { Tag } from "@/components/tag";
+import { CardArt, hasCardArt } from "@/components/sections/card-art";
 import type { ProjectMetric } from "@/lib/mdx";
 
 export type IndexCard = {
@@ -28,12 +29,16 @@ export function ProjectIndexCard({ card }: { card: IndexCard }) {
             className="size-full object-cover object-top"
           />
         </div>
+      ) : hasCardArt(card.slug) ? (
+        <div className="aspect-[16/10] w-full overflow-hidden border-b border-border bg-card">
+          <CardArt slug={card.slug} />
+        </div>
       ) : null}
       <div className="flex flex-1 flex-col p-5">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-metric text-base font-semibold text-foreground">
+        <h2 className="text-metric text-base font-semibold text-foreground">
           {card.title}
-        </h3>
+        </h2>
         {card.href ? (
           <ArrowUpRight
             className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"

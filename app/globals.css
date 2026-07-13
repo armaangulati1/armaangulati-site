@@ -98,6 +98,10 @@
   html {
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    /* Always reserve the scrollbar gutter so pages whose content crosses the
+       viewport-height threshold do not reflow horizontally (removes a desktop
+       layout shift on content-light routes like /resume). */
+    scrollbar-gutter: stable;
   }
   body {
     background-color: var(--background);

@@ -7,6 +7,7 @@ import { getPost, getPostSlugs } from "@/lib/mdx";
 import { renderMdx } from "@/lib/mdx-render";
 import { formatDate } from "@/lib/utils";
 import { SectionLabel, Tag } from "@/components/tag";
+import { ogImage, articleJsonLd, jsonLdScript } from "@/lib/seo";
 
 type Params = { slug: string };
 
@@ -22,15 +23,24 @@ export async function generateMetadata({
   const { slug } = await params;
   if (!getPostSlugs().includes(slug)) return {};
   const { frontmatter } = getPost(slug);
+  const images = ogImage({
+    title: frontmatter.title,
+    subtitle: frontmatter.summary,
+    eyebrow: "Writing",
+  });
   return {
     title: frontmatter.title,
     description: frontmatter.summary,
+    alternates: { canonical: `/writing/${slug}` },
     openGraph: {
       title: frontmatter.title,
       description: frontmatter.summary,
       type: "article",
+      url: `/writing/${slug}`,
       publishedTime: frontmatter.date,
+      images,
     },
+    twitter: { card: "summary_large_image", images: images.map((i) => i.url) },
   };
 }
 
@@ -45,8 +55,19 @@ export default async function Post({
   const { frontmatter, body, readingTime } = getPost(slug);
   const content = await renderMdx(body);
 
+  const articleLd = articleJsonLd({
+    title: frontmatter.title,
+    description: frontmatter.summary,
+    slug,
+    datePublished: frontmatter.date,
+  });
+
   return (
     <article className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={jsonLdScript(articleLd)}
+      />
       <Link
         href="/writing"
         className="inline-flex items-center gap-1 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground"

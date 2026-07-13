@@ -3,32 +3,30 @@ import { ArrowRight, Github, Linkedin, Mail } from "lucide-react";
 
 import { site } from "@/lib/site";
 import { Button } from "@/components/ui/button";
-import { AnimatedSection, AnimatedItem } from "@/components/animated-section";
 
+// The hero is the LCP element and is rendered statically (no JS-gated entrance
+// animation): a framer-motion opacity:0 initial state defers mobile LCP until
+// hydration. Below-the-fold sections keep their scroll entrance. (spec §9 motion
+// budget is preserved for revealed-on-scroll content; the fold paints instantly.)
 export function Hero() {
   return (
     <section className="mx-auto max-w-5xl px-4 pt-16 pb-14 sm:px-6 sm:pt-24 sm:pb-20">
-      <AnimatedSection className="max-w-3xl">
-        <AnimatedItem>
-          <h1
-            className="font-semibold leading-[1.05] tracking-[-0.02em] text-foreground"
-            style={{ fontSize: "clamp(2.4rem, 6vw, 4rem)" }}
-          >
-            Building AI systems for healthcare operations.
-          </h1>
-        </AnimatedItem>
+      <div className="max-w-3xl">
+        <h1
+          className="font-semibold leading-[1.05] tracking-[-0.02em] text-foreground"
+          style={{ fontSize: "clamp(2.4rem, 6vw, 4rem)" }}
+        >
+          Building AI systems for healthcare operations.
+        </h1>
 
-        <AnimatedItem>
-          <p className="mt-6 max-w-[60ch] text-lg leading-[1.65] text-muted-foreground">
-            Two years embedded with Medicaid providers as one of two engineers
-            on a platform that reached 35,000+ reported enrollments and
-            re-enrollments. Agentic systems for prior authorization and clinical
-            data, shipped with eval harnesses and honest numbers.
-          </p>
-        </AnimatedItem>
+        <p className="mt-6 max-w-[60ch] text-lg leading-[1.65] text-muted-foreground">
+          Two years embedded with Medicaid providers as one of two engineers on
+          a platform that reached 35,000+ reported enrollments and
+          re-enrollments. Agentic systems for prior authorization and clinical
+          data, shipped with eval harnesses and honest numbers.
+        </p>
 
-        <AnimatedItem>
-          <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="flex flex-wrap gap-3">
               <Button asChild size="lg" className="h-11">
                 <Link href="/projects">
@@ -69,8 +67,7 @@ export function Hero() {
               </a>
             </div>
           </div>
-        </AnimatedItem>
-      </AnimatedSection>
+        </div>
     </section>
   );
 }

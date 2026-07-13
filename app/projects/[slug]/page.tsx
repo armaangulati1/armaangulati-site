@@ -18,6 +18,11 @@ import { TocRail, TocDisclosure } from "@/components/case-study/toc";
 import { CtaStrip } from "@/components/case-study/cta-strip";
 import { EmailFab } from "@/components/case-study/email-fab";
 import { ProjectDiagram } from "@/components/diagrams";
+import {
+  ogImage,
+  softwareSourceCodeJsonLd,
+  jsonLdScript,
+} from "@/lib/seo";
 
 type Params = { slug: string };
 
@@ -33,10 +38,26 @@ export async function generateMetadata({
   const { slug } = await params;
   if (!getProjectSlugs().includes(slug)) return {};
   const { frontmatter } = getProject(slug);
+  const m = frontmatter.metrics?.[0];
+  const metric = m ? `${m.value} · ${m.label}` : undefined;
+  const images = ogImage({
+    title: frontmatter.title,
+    subtitle: frontmatter.oneLiner,
+    metric,
+    eyebrow: "Case study",
+  });
   return {
     title: frontmatter.title,
     description: frontmatter.oneLiner,
-    openGraph: { title: frontmatter.title, description: frontmatter.oneLiner },
+    alternates: { canonical: `/projects/${slug}` },
+    openGraph: {
+      title: frontmatter.title,
+      description: frontmatter.oneLiner,
+      type: "article",
+      url: `/projects/${slug}`,
+      images,
+    },
+    twitter: { card: "summary_large_image", images: images.map((i) => i.url) },
   };
 }
 
@@ -61,8 +82,27 @@ export default async function ProjectCaseStudy({
     ? { slug: nextDoc.slug, title: nextDoc.frontmatter.title }
     : null;
 
+  // SoftwareSourceCode JSON-LD only for case studies with a public repo
+  // (spec §13: the 3 with repos, never trust-marketplace, which has none).
+  const repo = frontmatter.links?.github;
+  const softwareLd = repo
+    ? softwareSourceCodeJsonLd({
+        name: frontmatter.title,
+        description: frontmatter.oneLiner,
+        codeRepository: repo,
+        slug,
+        languages: frontmatter.stack ?? [],
+      })
+    : null;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16 lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-10">
+      {softwareLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={jsonLdScript(softwareLd)}
+        />
+      ) : null}
       <aside className="lg:pt-40">
         <TocRail items={toc} />
       </aside>

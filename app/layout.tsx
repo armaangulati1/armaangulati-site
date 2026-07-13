@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 import { site } from "@/lib/site";
+import { ogImageUrl } from "@/lib/seo";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CommandPaletteProvider } from "@/components/command-palette";
 import { Nav } from "@/components/nav";
@@ -24,11 +26,32 @@ export const metadata: Metadata = {
     title: site.title,
     description: site.description,
     siteName: site.name,
+    images: [
+      {
+        url: ogImageUrl({
+          title: "Building AI systems for healthcare operations.",
+          subtitle:
+            "Two years embedded with Medicaid providers. Agentic systems, shipped and evaluated honestly.",
+          metric: "19.2% cohort engagement · ~12.8x benchmark",
+        }),
+        width: 1200,
+        height: 630,
+        alt: site.title,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: site.title,
     description: site.description,
+    images: [
+      ogImageUrl({
+        title: "Building AI systems for healthcare operations.",
+        subtitle:
+          "Two years embedded with Medicaid providers. Agentic systems, shipped and evaluated honestly.",
+        metric: "19.2% cohort engagement · ~12.8x benchmark",
+      }),
+    ],
   },
 };
 
@@ -61,6 +84,7 @@ export default function RootLayout({
             <main id="main-content">{children}</main>
             <Footer />
           </CommandPaletteProvider>
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
