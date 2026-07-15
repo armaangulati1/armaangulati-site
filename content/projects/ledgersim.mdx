@@ -1,0 +1,98 @@
+---
+title: "LedgerSim"
+oneLiner: "A weekend-scale core-banking ledger with a double-entry engine, product-contract hooks, and a Claude layer that turns plain-English product specs into validated parameters."
+role: "Solo builder"
+timeframe: "2026"
+stack:
+  - "Python"
+  - "Claude (claude-sonnet-5)"
+  - "Decimal money math"
+  - "pytest"
+  - "ruff"
+  - "GitHub Actions"
+tags:
+  - "fintech"
+  - "agents"
+  - "evals"
+featured: true
+metrics:
+  - value: "114/114"
+    label: "Field checks correct"
+    qualifier: "on its 19-spec self-authored golden set, single live run, zero misses"
+  - value: "3 bugs"
+    label: "Surfaced live, each regression-tested"
+    qualifier: "found by running the eval live rather than assuming it passed"
+  - value: "62"
+    label: "Offline tests + CI"
+    qualifier: "ruff clean, GitHub Actions green on first run"
+  - value: "double-entry"
+    label: "Balanced-batch ledger core"
+    qualifier: "typed rejection, authorization and settlement phases, Decimal-only money math"
+links:
+  github: "https://github.com/armaangulati1/ledgersim"
+diagram: "LedgerSimArchitectureDiagram"
+tldr:
+  - "A mini core-banking ledger built in a day: an append-only double-entry postings engine, Python product-contract hooks, and a Claude layer that converts plain-English product specs into validated contract parameters"
+  - "The spec-to-parameters agent scored 114/114 field checks on its 19-spec self-authored golden set in a single live run, with zero misses"
+  - "Running that eval live rather than assuming it passed surfaced three real bugs, each fixed with a regression test"
+---
+
+## Problem
+
+Core banking platforms model every account movement as double-entry postings, and a real deployment lives or dies on getting product behavior right down to the cent: interest accrual, overdraft, fee waivers. The interesting forward-deployed problem is not writing one product. It is turning a customer's plain-English description of a product into parameters a ledger will actually honor, and knowing when that translation is wrong before it touches a balance. LedgerSim is a weekend-scale simulation I built to work that problem end to end: a double-entry ledger, product-contract hooks, and an agent layer that reads a spec and emits validated parameters.
+
+## Why it mattered
+
+I built LedgerSim as the concrete artifact behind a Forward Deployed Engineer application to a core-banking company. The claim I wanted to be able to defend was not "I know core banking." It is narrower and honest: I can model a double-entry ledger, express product behavior as typed contracts, and put an LLM in front of that where the failure mode is a bad parameter rather than a bad vibe. The eval is the point, and I ran it live rather than reporting a number I assumed.
+
+## Architecture
+
+- A plain-English product spec enters an agent layer built on claude-sonnet-5, which converts it into validated contract parameters rather than free text.
+- The parameters configure one of two product contracts, each implementing the same hook interface: `validate_posting` and `on_scheduled_event`. Savings runs daily interest accrual on an Actual/365 Fixed basis with a monthly payout and retains sub-cent remainders; checking enforces a hold-aware available-balance overdraft and an average-balance fee waiver.
+- Every movement is written to an append-only double-entry postings ledger. A posting batch must balance or it is rejected with a typed error; money is Decimal-only and float inputs are rejected at the boundary.
+- Postings move through an authorization phase and a settlement phase, with holds that settle or release, so available balance and cleared balance stay distinct.
+- A deterministic day-by-day simulation runner advances scheduled events (accrual, payout, fee assessment) so a product's behavior over time is reproducible.
+- A side rail runs the eval harness: a 19-spec golden set that scores the agent's parameter output field by field, plus 62 offline tests under ruff and GitHub Actions.
+
+## Technical decisions
+
+**Decimal-only money math with floats rejected at the boundary.** Alternative: accept floats and round at the edges. In money code a float that reaches an accrual calculation compounds a rounding error every day, so the ledger rejects float inputs with a typed error rather than silently coercing them. This decision is also what surfaced one of the three live bugs below.
+
+**Balanced-batch enforcement instead of trusting callers.** Alternative: assume every posting batch nets to zero. A double-entry ledger is only trustworthy if an unbalanced batch cannot be written, so the core rejects it with a typed error rather than recording a lopsided entry a later report would have to reconcile.
+
+**Product behavior as hook contracts (`validate_posting` / `on_scheduled_event`) instead of hard-coded product logic.** Alternative: special-case savings and checking inside the ledger. Keeping products behind a small hook interface is what lets the agent layer target a stable parameter surface, and it is why adding a product does not touch the ledger core.
+
+**An agent that emits validated parameters, not prose.** Alternative: let the model describe the product in words and interpret it downstream. The whole risk in a spec-to-product step is a plausible-sounding wrong number, so the agent output is parsed into typed parameters and validated, and the golden set scores those exact fields.
+
+## Interesting challenges
+
+The sharpest part of this build was the live eval, and specifically what it caught. I scored the spec-to-parameters agent against a 19-spec golden set that includes reworded specs, distractor detail, a basis-point unit trap, and missing-field cases, and it got 114 of 114 field checks correct with zero misses on that self-authored set. The number matters less than how I got it. I ran it live against the model instead of trusting that the pipeline worked, and that live run surfaced three real bugs. A deprecated temperature parameter on claude-sonnet-5 was rejected by the API. JSON numeric literals were arriving as floats right at the Decimal money boundary the ledger deliberately guards. And the model's response came back with a thinking block first, which the initial parser did not expect. Each one is now a regression test. If I had reported the eval from an offline mock, all three would still be latent.
+
+## Results
+
+| Metric | Value | Qualifier |
+|---|---|---|
+| Agent field checks correct | 114/114 | on its 19-spec self-authored golden set, single live run, zero misses |
+| Golden-set tiers covered | reworded, distractor, bps unit trap, missing field | the 19 specs are self-authored, not an independent benchmark |
+| Real bugs surfaced by the live run | 3 | deprecated temperature param, float-at-Decimal boundary, thinking-block parsing; each regression-tested |
+| Offline test suite | 62 tests | ruff clean, GitHub Actions green on first run |
+
+## Scope and honest limits
+
+LedgerSim is an independent weekend-scale simulation, inspired by the publicly described design of cloud-native core-banking platforms (notably Thought Machine's Vault). All identifiers and interfaces are LedgerSim's own; nothing here reproduces a proprietary API. It is not affiliated with any banking platform, and it does not touch real money.
+
+The eval is a 19-spec golden set I wrote myself. The result of 114 of 114 field checks correct is a clean score on that set, and it is a single live run on a small self-authored corpus. A larger or independently authored set could surface misses, and the README says so.
+
+What this project does not claim: no Vault or Vault API experience or access, no ISO 20022, no real payment rails or settlement networks, no production banking, and nothing about regulatory or compliance handling. It is core-banking modeling at the scale of a demo, not core-banking domain experience beyond this build.
+
+## Lessons
+
+Running an eval live is a different activity from reporting one. The 114/114 field-check result on that 19-spec self-authored set is only trustworthy because the act of producing it broke the pipeline three times and I fixed each break with a test.
+
+A typed boundary earns its keep exactly when something upstream misbehaves. The Decimal guard existed on principle, and then a real float arrived at it from the model's JSON output. That guard is the reason it never became a silent rounding bug.
+
+## Future work
+
+- Expand the golden set beyond 19 self-authored specs, ideally with specs written by someone other than me, before trusting the field-check number past a demo.
+- Add more product contracts (term deposits, tiered interest) to test whether the hook interface holds without leaking product logic into the ledger.
+- Model multi-currency postings, which the current single-currency ledger does not attempt.

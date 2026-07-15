@@ -84,6 +84,48 @@ export const featuredProjects: Project[] = [
     tags: ["healthcare", "evals", "LoRA"],
   },
   {
+    slug: "handoff-lens",
+    name: "handoff-lens",
+    problem:
+      "A design-to-code readiness assistant that reads a Figma file through the public Figma REST API, runs deterministic checks, and writes a customer-facing summary.",
+    metrics: [
+      {
+        value: "1.000 / 1.000",
+        label: "precision / recall, deterministic checks",
+        qualifier: "on its 6-fixture self-authored set; 11/11 planted findings",
+        mono: true,
+      },
+      {
+        value: "schema-valid",
+        label: "all 6 LLM summaries, live run",
+        qualifier: "liveness and schema-validity only, explicitly not an accuracy score",
+        mono: false,
+      },
+    ],
+    tags: ["design-tools", "agents", "evals"],
+  },
+  {
+    slug: "ledgersim",
+    name: "LedgerSim",
+    problem:
+      "A weekend-scale core-banking ledger: a double-entry engine, product-contract hooks, and a Claude layer that turns plain-English product specs into validated parameters.",
+    metrics: [
+      {
+        value: "114/114",
+        label: "field checks correct",
+        qualifier: "on its 19-spec self-authored golden set, single live run",
+        mono: true,
+      },
+      {
+        value: "3 bugs",
+        label: "surfaced live, each regression-tested",
+        qualifier: "found by running the eval live rather than assuming it passed",
+        mono: true,
+      },
+    ],
+    tags: ["fintech", "agents", "evals"],
+  },
+  {
     slug: "chartextract-ui",
     name: "ChartExtract-UI",
     problem:

@@ -271,10 +271,110 @@ function ClinicalRagArt() {
   );
 }
 
+// ledgersim: spec -> agent -> params -> double-entry ledger, with a golden-set
+// eval feeding the agent from above.
+function LedgerSimArt() {
+  const y = 84;
+  const h = 34;
+  return (
+    <Frame>
+      <Box x={12} y={y} w={62} h={h} label="spec" />
+      <Arrow x1={74} x2={90} y={y + h / 2} />
+      <Box x={90} y={y} w={58} h={h} label="agent" tone="brand" />
+      <Arrow x1={148} x2={164} y={y + h / 2} />
+      <Box x={164} y={y} w={62} h={h} label="params" />
+      <Arrow x1={226} x2={242} y={y + h / 2} />
+      <Box x={242} y={y} w={66} h={h} label="ledger" tone="success" />
+      {/* golden-set eval feeding the agent */}
+      <rect
+        x={90}
+        y={30}
+        width={90}
+        height={28}
+        rx={7}
+        fill="var(--card)"
+        stroke="var(--border)"
+        strokeWidth={1.5}
+      />
+      <text
+        x={135}
+        y={44}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={10}
+        fill="var(--muted-foreground)"
+        style={{ fontFamily: "var(--font-sans), system-ui, sans-serif" }}
+      >
+        golden set
+      </text>
+      <line
+        x1={119}
+        y1={58}
+        x2={119}
+        y2={y}
+        stroke="var(--muted-foreground)"
+        strokeWidth={1.5}
+        markerEnd="url(#cardart-arrow)"
+      />
+    </Frame>
+  );
+}
+
+// handoff-lens: figma file -> checks -> score -> readiness summary, with the
+// public Figma REST API feeding the checks from above.
+function HandoffLensArt() {
+  const y = 84;
+  const h = 34;
+  return (
+    <Frame>
+      <Box x={12} y={y} w={62} h={h} label="figma" />
+      <Arrow x1={74} x2={90} y={y + h / 2} />
+      <Box x={90} y={y} w={58} h={h} label="checks" tone="brand" />
+      <Arrow x1={148} x2={164} y={y + h / 2} />
+      <Box x={164} y={y} w={62} h={h} label="score" />
+      <Arrow x1={226} x2={242} y={y + h / 2} />
+      <Box x={242} y={y} w={66} h={h} label="summary" tone="success" />
+      {/* public REST API feeding the checks */}
+      <rect
+        x={90}
+        y={30}
+        width={90}
+        height={28}
+        rx={7}
+        fill="var(--card)"
+        stroke="var(--border)"
+        strokeWidth={1.5}
+      />
+      <text
+        x={135}
+        y={44}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={10}
+        fill="var(--muted-foreground)"
+        style={{ fontFamily: "var(--font-sans), system-ui, sans-serif" }}
+      >
+        public API
+      </text>
+      <line
+        x1={119}
+        y1={58}
+        x2={119}
+        y2={y}
+        stroke="var(--muted-foreground)"
+        strokeWidth={1.5}
+        markerEnd="url(#cardart-arrow)"
+      />
+    </Frame>
+  );
+}
+
 const registry: Record<string, () => React.ReactElement> = {
   "clinical-ops-copilot": CopilotArt,
   "trust-marketplace": TrustArt,
   "clinical-rag": ClinicalRagArt,
+  ledgersim: LedgerSimArt,
+  "handoff-lens": HandoffLensArt,
 };
 
 export function CardArt({ slug }: { slug: string }) {

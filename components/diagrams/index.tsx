@@ -2,6 +2,8 @@ import type { ComponentType } from "react";
 
 import { CopilotArchitecture } from "./copilot-architecture";
 import { ExtractionPipeline } from "./extraction-pipeline";
+import { HandoffLensArchitecture } from "./handoff-lens-architecture";
+import { LedgerSimArchitecture } from "./ledgersim-architecture";
 import { ReferralPlatform } from "./referral-platform";
 import { ReviewConsole } from "./review-console";
 
@@ -9,6 +11,8 @@ import { ReviewConsole } from "./review-console";
 const registry: Record<string, ComponentType> = {
   AgentArchitectureDiagram: CopilotArchitecture,
   ExtractionPipelineDiagram: ExtractionPipeline,
+  HandoffLensArchitectureDiagram: HandoffLensArchitecture,
+  LedgerSimArchitectureDiagram: LedgerSimArchitecture,
   ReferralPlatformDiagram: ReferralPlatform,
   ReviewConsoleDiagram: ReviewConsole,
 };
@@ -23,6 +27,8 @@ export function ProjectDiagram({ name }: { name?: string }) {
 export {
   CopilotArchitecture,
   ExtractionPipeline,
+  HandoffLensArchitecture,
+  LedgerSimArchitecture,
   ReferralPlatform,
   ReviewConsole,
 };
