@@ -126,6 +126,27 @@ export const featuredProjects: Project[] = [
     tags: ["fintech", "agents", "evals"],
   },
   {
+    slug: "repsignal",
+    name: "RepSignal",
+    problem:
+      "A TypeScript and Node.js conversation-intelligence integration: a webhook ingests a sales-call transcript, a shared Zod schema validates it, and Claude returns a schema-validated coaching scorecard.",
+    metrics: [
+      {
+        value: "77/84",
+        label: "field checks",
+        qualifier: "on its self-authored synthetic 14-transcript eval set, representative live run",
+        mono: true,
+      },
+      {
+        value: "3 bugs",
+        label: "surfaced live, each fixed",
+        qualifier: "found by running the eval live, first two regression-tested",
+        mono: true,
+      },
+    ],
+    tags: ["typescript", "integrations", "agents"],
+  },
+  {
     slug: "chartextract-ui",
     name: "ChartExtract-UI",
     problem:
