@@ -8,7 +8,7 @@ import type { IndexCard } from "@/components/sections/project-index-card";
 import { ogImage } from "@/lib/seo";
 
 const description =
-  "Healthcare-AI systems built and evaluated by Armaan Gulati, with honest metrics and disclosed limitations.";
+  "Applied-AI systems, healthcare-AI first, built and evaluated by Armaan Gulati, with honest metrics and disclosed limitations.";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -54,9 +54,9 @@ export default function ProjectsPage() {
         Projects
       </h1>
       <p className="mt-4 max-w-[60ch] text-lg leading-[1.65] text-muted-foreground">
-        Healthcare-AI systems, each with an architecture diagram, the technical
-        decisions behind it, and a results table where every metric shows its
-        qualifier. The failures are in here too, on purpose.
+        Applied-AI systems, healthcare-AI first, each with an architecture
+        diagram, the technical decisions behind it, and a results table where
+        every metric shows its qualifier. The failures are in here too, on purpose.
       </p>
 
       <ProjectExplorer cards={cards} />
