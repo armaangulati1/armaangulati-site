@@ -68,6 +68,7 @@ const PROJECT_ORDER = [
   "chartextractor",
   "handoff-lens",
   "ledgersim",
+  "repsignal",
   "trust-marketplace",
   "chartextract-ui",
 ];

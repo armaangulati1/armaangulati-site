@@ -5,6 +5,7 @@ import { ExtractionPipeline } from "./extraction-pipeline";
 import { HandoffLensArchitecture } from "./handoff-lens-architecture";
 import { LedgerSimArchitecture } from "./ledgersim-architecture";
 import { ReferralPlatform } from "./referral-platform";
+import { RepSignalArchitecture } from "./repsignal-architecture";
 import { ReviewConsole } from "./review-console";
 
 // Maps the frontmatter `diagram` field to its animated SVG component.
@@ -14,6 +15,7 @@ const registry: Record<string, ComponentType> = {
   HandoffLensArchitectureDiagram: HandoffLensArchitecture,
   LedgerSimArchitectureDiagram: LedgerSimArchitecture,
   ReferralPlatformDiagram: ReferralPlatform,
+  RepSignalArchitectureDiagram: RepSignalArchitecture,
   ReviewConsoleDiagram: ReviewConsole,
 };
 
@@ -30,5 +32,6 @@ export {
   HandoffLensArchitecture,
   LedgerSimArchitecture,
   ReferralPlatform,
+  RepSignalArchitecture,
   ReviewConsole,
 };
