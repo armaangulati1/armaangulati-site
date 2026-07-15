@@ -18,7 +18,7 @@ export function RepSignalArchitecture() {
   return (
     <DiagramFrame
       title="RepSignal architecture"
-      desc="A sales-call transcript arrives at a Node.js webhook and is validated against a shared Zod schema that is the single source of truth for both apps. The validated transcript is passed to Claude with forced tool-use, which emits a coaching scorecard (talk/listen ratio, discovery questions, objections, next-step secured, risk flags, coaching tips) that is itself validated against the same schema. The scorecard is served by a typed REST API and rendered by a React and TypeScript dashboard. A side rail runs the eval harness, a self-authored synthetic 14-transcript set that scored 77 of 84 field checks, plus 35 offline Vitest tests, ESLint, and continuous integration."
+      desc="A sales-call transcript arrives at a Node.js webhook and is validated against a shared Zod schema that is the single source of truth for both apps. The validated transcript is passed to Claude with forced tool-use, which emits the judgment fields of a coaching scorecard (discovery questions, objections, next-step secured, risk flags, coaching tips) that is itself validated against the same schema; the talk/listen ratio is computed deterministically in code, not by the model. The scorecard is served by a typed REST API and rendered by a React and TypeScript dashboard. A side rail runs the eval harness, a self-authored synthetic 14-transcript set that scored 66 of 70 LLM-judged field checks, plus 47 offline Vitest tests, ESLint, and continuous integration."
       viewBox="0 0 840 380"
       minWidth={780}
     >
@@ -67,11 +67,11 @@ export function RepSignalArchitecture() {
 
       {/* side rail: synthetic eval set + CI */}
       <Node x={296} y={300} w={158} h={50} lines={["Eval harness"]} sub="14 synthetic transcripts" />
-      <Node x={488} y={300} w={150} h={50} lines={["CI + 35 tests"]} sub="Vitest + ESLint" tone="gate" />
+      <Node x={488} y={300} w={150} h={50} lines={["CI + 47 tests"]} sub="Vitest + ESLint" tone="gate" />
       <Edge d="M 352 206 C 352 254, 332 266, 372 298" delay={0.4} />
       <Edge d="M 454 325 L 486 325" delay={0.48} />
       <Caption x={430} y={370} anchor="middle">
-        77/84 field checks on its self-authored synthetic 14-transcript eval set
+        66/70 LLM-judged field checks on its self-authored synthetic 14-transcript eval set
       </Caption>
 
       <PulseDot
