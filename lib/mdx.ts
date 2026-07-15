@@ -66,6 +66,8 @@ export type PostDoc = {
 const PROJECT_ORDER = [
   "clinical-ops-copilot",
   "chartextractor",
+  "handoff-lens",
+  "ledgersim",
   "trust-marketplace",
   "chartextract-ui",
 ];
