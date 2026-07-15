@@ -43,7 +43,7 @@ tldr:
 
 ## Problem
 
-Sales conversation-intelligence tools listen to calls and tell a rep what to do better next time. The interesting forward-deployed problem is not the model, it is the integration: taking an unstructured transcript that arrives over a webhook and turning it into structured, schema-validated coaching a downstream system can actually trust. RepSignal is a one-day build of exactly that integration. A sales-call transcript arrives at a Node.js webhook, gets validated, goes to an LLM under a forced tool-use contract, and comes back as a typed coaching scorecard.
+Sales conversation-intelligence tools listen to calls and tell a rep what to do better next time. The interesting forward-deployed problem is not the model; it is the integration: taking an unstructured transcript that arrives over a webhook and turning it into structured, schema-validated coaching a downstream system can actually trust. RepSignal is a one-day build of exactly that integration. A sales-call transcript arrives at a Node.js webhook, gets validated, goes to an LLM under a forced tool-use contract, and comes back as a typed coaching scorecard.
 
 ## Why it mattered
 
@@ -105,7 +105,7 @@ Running an eval live is a different activity from reporting one. The 66 of 70 LL
 
 The eval also told me where a metric belonged. Watching the talk/listen ratio miss on a value that has one correct answer was the signal to move it out of the model and into a deterministic function. The lesson is to let the model judge only what needs judgment, and to compute everything computable in code where it can be exact.
 
-A schema at the center pays for itself at both boundaries. The same Zod definition caught a malformed transcript coming in and rejects a malformed scorecard going out, and because the TypeScript types are inferred from it, the API and the dashboard cannot silently disagree about a field.
+A schema at the center pays for itself at both boundaries. The same Zod definition catches a malformed transcript coming in and rejects a malformed scorecard going out, and because the TypeScript types are inferred from it, the API and the dashboard cannot silently disagree about a field.
 
 ## Future work
 
