@@ -19,13 +19,13 @@ tags:
   - "evals"
 featured: true
 metrics:
-  - value: "77/84"
-    label: "Field checks correct"
+  - value: "66/70"
+    label: "LLM-judged field checks"
     qualifier: "on its self-authored synthetic 14-transcript eval set, one live run; representative not fixed"
-  - value: "3 bugs"
-    label: "Surfaced live, each fixed"
-    qualifier: "found by running the eval live on Node 20; the first two regression-tested"
-  - value: "35"
+  - value: "14/14"
+    label: "Talk/listen ratio, deterministic"
+    qualifier: "computed in code, exact by construction; reported separately from the 70 LLM-judged checks"
+  - value: "47"
     label: "Offline tests + CI"
     qualifier: "Vitest and ESLint, GitHub Actions green; no API key needed in CI"
   - value: "one schema"
@@ -36,7 +36,8 @@ links:
 diagram: "RepSignalArchitectureDiagram"
 tldr:
   - "A TypeScript and Node.js conversation-intelligence integration built in a day: a webhook ingests a sales-call transcript, a shared Zod schema validates it, Claude under forced tool-use returns a coaching scorecard, and a typed REST API plus a React dashboard serve it"
-  - "The extractor scored 77 of 84 field checks on its self-authored synthetic 14-transcript eval set in one live run, with 9 of 14 transcripts fully correct and the two recurring miss types disclosed"
+  - "I moved the one computable metric, the talk/listen ratio, out of the LLM into a single deterministic function shared by the API and the eval, so the model only judges what needs judgment"
+  - "The extractor scored 66 of 70 LLM-judged field checks on its self-authored synthetic 14-transcript eval set in one live run, with the talk/listen ratio 14/14 deterministic and exact by construction, reported separately"
   - "Running that eval live rather than assuming it passed surfaced three real bugs, each fixed, the first two with regression tests"
 ---
 
@@ -52,43 +53,47 @@ I built RepSignal to close a specific, recurring gap in my portfolio: TypeScript
 
 - A sales-call transcript arrives at a Node.js and Express webhook endpoint (`POST /webhooks/transcripts`).
 - The payload is validated against a shared Zod schema before anything else touches it. That schema lives in its own package and is the single source of truth: both the API and the dashboard import it, and the inferred TypeScript types come from it rather than being written twice.
-- The validated transcript is passed to Claude (claude-sonnet-5) with forced tool-use, so the model must return a structured coaching scorecard rather than prose.
-- The scorecard is validated against the same schema on the way out. Its fields are the conversation-intelligence signal: talk/listen ratio, discovery questions asked, objections raised, whether a next step was secured with an evidence quote, risk flags, and coaching tips.
+- The talk/listen ratio, the one field that is a pure computation rather than a judgment, is computed in code by a single deterministic function (`computeTalkListenRatio`) that both the API and the eval import. The model never sees it.
+- The validated transcript is passed to Claude (claude-sonnet-5) with forced tool-use, so the model must return a structured coaching scorecard rather than prose. The model judges only the five fields that need judgment: discovery questions asked, objections raised, whether a next step was secured with an evidence quote, risk flags, and coaching tips.
+- The scorecard is validated against the same schema on the way out, with the deterministic talk/listen ratio merged in, so the served object carries the full conversation-intelligence signal.
 - The scorecard is served by a typed REST API (`GET /scorecards/:id`, `GET /health`) and rendered by a React and TypeScript (Vite) dashboard.
-- A side rail runs the eval harness, a self-authored synthetic 14-transcript set that scores the extractor field by field, plus 35 offline Vitest tests under ESLint and GitHub Actions. CI runs with no API key, because the LLM responses in tests are fixtured.
+- A side rail runs the eval harness, a self-authored synthetic 14-transcript set that scores the five LLM-judged fields field by field and checks the deterministic ratio separately, plus 47 offline Vitest tests under ESLint and GitHub Actions. CI runs with no API key, because the LLM responses in tests are fixtured.
 - The whole thing is a Turborepo monorepo, so the schema package, the API, and the dashboard build and test as one graph.
 
 ## Technical decisions
+
+**The computable metric belongs in code, not in the model.** The talk/listen ratio is arithmetic: it is speaker-time divided by total time, and it has one correct answer for a given transcript. My first version let the LLM estimate it alongside the genuine-judgment fields, and the eval showed exactly why that was wrong, since the model's estimates drifted just outside the golden tolerance. So I moved that metric out of the LLM into a single deterministic function shared by the API and the eval, and now the model only judges what actually needs judgment. This eliminated a whole class of misses at a stroke and made the ratio exact by construction, while shrinking the surface the LLM is accountable for from six fields to five.
 
 **One Zod schema as the single source of truth, not types written twice.** Alternative: hand-write TypeScript interfaces and validate separately. A conversation-intelligence integration sits at a trust boundary in both directions, untrusted transcript coming in and model-generated scorecard going out, so a single Zod schema validates both and the TypeScript types are inferred from it. There is one place a field can change.
 
 **Forced tool-use, so the model returns a scorecard, not prose.** Alternative: prompt for JSON and hope. The risk in an extraction step is a plausible-sounding malformed field, so the model is constrained to the tool schema and the result is Zod-validated before it is stored or served. A bad field is rejected, not rendered.
 
-**Offline, fixtured CI with no API key.** Alternative: call the live model in CI. Tests that hit a paid nondeterministic API are slow, flaky, and leak keys, so the 35 tests run against fixtured LLM responses and stay deterministic. The live model is exercised separately, as an eval I run by hand.
+**Offline, fixtured CI with no API key.** Alternative: call the live model in CI. Tests that hit a paid nondeterministic API are slow, flaky, and leak keys, so the 47 tests run against fixtured LLM responses and stay deterministic. The live model is exercised separately, as an eval I run by hand.
 
 **A Turborepo monorepo instead of three loose packages.** Alternative: separate repos or a single flat app. Keeping the schema package, the API, and the dashboard in one Turborepo graph is what makes "the dashboard uses the same types as the API" a build guarantee rather than a hope.
 
 ## Interesting challenges
 
-The sharpest part of this build was the live eval, and specifically what it caught. I scored the extractor against a self-authored synthetic 14-transcript set covering strong discovery, missed next steps, heavy objections, and monologue-heavy bad talk ratios, and it got 77 of 84 field checks correct, with 9 of the 14 transcripts scoring a clean 6 of 6 and the other 5 partial. That number is representative, not fixed: the LLM varies run to run, so a rerun lands near it rather than exactly on it. The number matters less than how I got it. Running the eval live surfaced three real bugs that offline mocks would have hidden. In the monorepo, dotenv was loading from the workspace directory instead of the repo root, so the key was never found. The API's default port collided with a local Next.js server. And on Node 24, undici was dropping long model responses with a "Premature close" error, which I fixed by pinning Node 20 LTS and hardening the streaming path with retries. Each was fixed, and the first two got regression tests.
+The sharpest part of this build was the live eval, and specifically what it caught. I scored the extractor against a self-authored synthetic 14-transcript set covering strong discovery, missed next steps, heavy objections, and monologue-heavy bad talk ratios. The model judges five fields per transcript, so the LLM-judged score is out of 70, and it got 66 of 70 LLM-judged field checks correct on this run. The talk/listen ratio sits outside that number: it is computed deterministically, so it is 14 of 14 by construction and I report it separately rather than folding it into the 70. The 66 of 70 is representative, not fixed: the LLM varies run to run, so a rerun lands near it rather than exactly on it. The number matters less than how I got it. Running the eval live surfaced three real bugs that offline mocks would have hidden. In the monorepo, dotenv was loading from the workspace directory instead of the repo root, so the key was never found. The API's default port collided with a local Next.js server. And on Node 24, undici was dropping long model responses with a "Premature close" error, which I fixed by pinning Node 20 LTS and hardening the streaming path with retries. Each was fixed, and the first two got regression tests.
 
-Two recurring miss types account for most of the seven misses, and I disclose both. The talk/listen ratio is an estimate that sometimes lands just outside the golden tolerance band, and the risk-flag extraction is conservative, so it over-flags on ambiguous lines. The golden labels were written to be right, not tuned to make the score look better.
+Moving the talk/listen ratio into deterministic code did more than make one field exact: it removed a whole class of misses. In the earlier six-field version, the ratio estimates drifted just outside the golden tolerance band and cost several checks, and those misses are now gone. The sole remaining disagreement is that the model is conservative about risk. On 4 of the 14 transcripts it raises a risk flag where the golden label had none, over-flagging on ambiguous lines rather than under-flagging. The golden labels were written to be right, not tuned to make the score look better.
 
 ## Results
 
 | Metric | Value | Qualifier |
 |---|---|---|
-| Field checks correct | 77/84 | on its self-authored synthetic 14-transcript eval set, one live run; representative not fixed |
-| Transcripts fully correct | 9/14 | a clean 6/6 each; the other 5 partial |
+| LLM-judged field checks | 66/70 | five judged fields across its self-authored synthetic 14-transcript eval set, one live run; representative not fixed |
+| Talk/listen ratio | 14/14 deterministic | computed in code, exact by construction; reported separately, never folded into the 70 |
+| Sole remaining miss type | conservative risk over-flagging | the model raises a risk flag on 4 of 14 transcripts where the golden label had none |
 | Real bugs surfaced by the live run | 3 | monorepo dotenv root, port collision, Node 24 undici premature close; each fixed, first two regression-tested |
-| Offline test suite | 35 tests | Vitest and ESLint, GitHub Actions green on CI; no API key needed |
+| Offline test suite | 47 tests | Vitest and ESLint, GitHub Actions green on CI; no API key needed |
 | Shared schema | one Zod source of truth | inferred TypeScript types, imported by both the API and the dashboard |
 
 ## Scope and honest limits
 
 RepSignal is an independent one-day project. Every transcript is synthetic, self-authored, and self-scored; there is no real call data anywhere in it. It is not a real integration: it is not connected to any CRM, telephony provider, or conversation-intelligence platform, and it is not affiliated with or endorsed by any company in that space.
 
-The eval is a self-authored synthetic 14-transcript set. The result of 77 of 84 field checks is a clean-enough score on that small set from a single live run, and because the LLM varies, it is representative rather than a fixed benchmark. A larger or independently authored set, or a stricter talk/listen tolerance, would move the number.
+The eval is a self-authored synthetic 14-transcript set. The result of 66 of 70 LLM-judged field checks is a clean-enough score on that small set from a single live run, and because the LLM varies, it is representative rather than a fixed benchmark. The talk/listen ratio is a separate deterministic number, 14 of 14 by construction, and it is never folded into the 70. A larger or independently authored set would move the LLM-judged number.
 
 The `infra/` directory holds a minimal Terraform config as a demonstration of how the service would deploy. It was never applied. There is no hosted instance, which is why this write-up carries no live-demo link.
 
@@ -96,12 +101,14 @@ What this project does not claim: no TypeScript or Node.js at production scale o
 
 ## Lessons
 
-Running an eval live is a different activity from reporting one. The 77 of 84 field-check result on that synthetic 14-transcript set is only trustworthy because producing it broke the pipeline three times, at the environment, the port, and the HTTP layer, and I fixed each break before trusting the number.
+Running an eval live is a different activity from reporting one. The 66 of 70 LLM-judged field-check result on that synthetic 14-transcript set is only trustworthy because producing it broke the pipeline three times, at the environment, the port, and the HTTP layer, and I fixed each break before trusting the number.
+
+The eval also told me where a metric belonged. Watching the talk/listen ratio miss on a value that has one correct answer was the signal to move it out of the model and into a deterministic function. The lesson is to let the model judge only what needs judgment, and to compute everything computable in code where it can be exact.
 
 A schema at the center pays for itself at both boundaries. The same Zod definition caught a malformed transcript coming in and rejects a malformed scorecard going out, and because the TypeScript types are inferred from it, the API and the dashboard cannot silently disagree about a field.
 
 ## Future work
 
 - Expand the eval beyond 14 self-authored synthetic transcripts, ideally with transcripts written by someone other than me, before trusting the field-check number past a demo.
-- Tighten the talk/listen-ratio estimation and calibrate the risk-flag threshold, the two recurring miss types, against a labeled tolerance.
+- Calibrate the risk-flag threshold, the sole remaining miss type, against a labeled tolerance so the model stops over-flagging on ambiguous lines.
 - Connect a real transcript source behind the same webhook contract to test whether the schema holds against messy real-world input rather than clean synthetic transcripts.

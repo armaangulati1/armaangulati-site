@@ -132,9 +132,9 @@ export const featuredProjects: Project[] = [
       "A TypeScript and Node.js conversation-intelligence integration: a webhook ingests a sales-call transcript, a shared Zod schema validates it, and Claude returns a schema-validated coaching scorecard.",
     metrics: [
       {
-        value: "77/84",
-        label: "field checks",
-        qualifier: "on its self-authored synthetic 14-transcript eval set, representative live run",
+        value: "66/70",
+        label: "LLM-judged field checks",
+        qualifier: "LLM-judged, on its self-authored synthetic 14-transcript eval set, representative live run",
         mono: true,
       },
       {
