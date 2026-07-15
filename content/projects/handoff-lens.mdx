@@ -1,0 +1,103 @@
+---
+title: "handoff-lens"
+oneLiner: "A design-to-code readiness assistant that reads a Figma file through the public Figma REST API, runs deterministic readiness checks, and writes a customer-facing summary."
+role: "Solo builder"
+timeframe: "2026"
+stack:
+  - "Python"
+  - "Figma REST API (public)"
+  - "Claude (claude-sonnet-5)"
+  - "pytest"
+  - "ruff"
+  - "GitHub Actions"
+tags:
+  - "design-tools"
+  - "agents"
+  - "evals"
+featured: true
+metrics:
+  - value: "1.000 / 1.000"
+    label: "Precision / recall, deterministic checks"
+    qualifier: "on its 6-fixture self-authored set; 6/6 fixtures exact, 11/11 planted findings, 0 false positives"
+  - value: "schema-valid"
+    label: "All 6 LLM summaries, live run"
+    qualifier: "liveness and schema-validity only, explicitly not an accuracy score"
+  - value: "~4.9MB"
+    label: "Real-world file parsed cleanly"
+    qualifier: "a large community design system, thousands of nodes; robustness not accuracy, no per-file score published"
+  - value: "55"
+    label: "Offline tests + CI"
+    qualifier: "ruff clean, GitHub Actions green on first run"
+links:
+  github: "https://github.com/armaangulati1/handoff-lens"
+diagram: "HandoffLensArchitectureDiagram"
+tldr:
+  - "A design-to-code readiness assistant that ingests a Figma file through the public Figma REST API, runs five deterministic check functions (six checks), and adds an LLM-written readiness summary"
+  - "The deterministic layer scored precision 1.000 and recall 1.000 on its 6-fixture self-authored set, with 6/6 fixtures exact and 11/11 planted findings"
+  - "The LLM layer was live-verified only for producing complete schema-valid summaries on all six fixtures, which is a liveness check and explicitly not an accuracy score"
+---
+
+## Problem
+
+When a design file is handed to engineers to build, small hygiene problems are what quietly turn a clean handoff into a slow one: detached component instances, hardcoded colors that should be shared styles, frames without auto-layout, unnamed layers. A readiness assessment is exactly the kind of technical discovery a forward-deployed engineer runs before a customer deployment. handoff-lens is a small version of that. Point it at a Figma file, get a deterministic list of what will make the design-to-code handoff harder, plus a plain-English summary a non-engineer can read.
+
+## Why it mattered
+
+I built handoff-lens right after applying to a Figma Forward Deployed Engineer role, as the concrete version of a line in the job description about running technical readiness assessments for customer deployments. The honest framing is the whole point. The readiness rules are my own demonstration heuristics, not Figma's criteria, and the tool works with Figma's public API rather than claiming any relationship with the company. What I wanted to show is that I can build the assessment, evaluate the deterministic part rigorously, and stay precise about what the LLM part has and has not been proven to do.
+
+## Architecture
+
+- A Figma file is ingested through the public, documented Figma REST API. Because the API is public, the field names in this project are the real ones.
+- A parser walks the node tree and hands it to five deterministic readiness check functions, which together emit six checks: detached instances, hardcoded-versus-shared styles (this one emits two checks), missing auto-layout, unnamed layers, and implied variants.
+- Each check contributes to a transparent readiness score computed as 100 minus penalties, so the number is fully explainable from the findings rather than being a black box.
+- An LLM layer built on claude-sonnet-5 turns the structured findings into a customer-facing readiness summary in prose.
+- A side rail runs two separate evals, deterministic and LLM, plus 55 offline tests under ruff and GitHub Actions. The two evals are reported as two different results and never combined into one number.
+
+## Technical decisions
+
+**A deterministic score computed as 100 minus penalties, not an LLM-assigned grade.** Alternative: ask the model to rate readiness directly. The readiness number needs to be defensible line by line, so it is computed from the deterministic findings, and the LLM only narrates what the checks already found.
+
+**Five check functions emitting six checks, kept explicit.** Alternative: one catch-all quality score. Separating detached instances, hardcoded styles, missing auto-layout, unnamed layers, and implied variants means each finding points at a specific, fixable thing in the file rather than a vague quality feeling.
+
+**Two evals that are never merged.** Alternative: report one headline accuracy number for the whole tool. The deterministic checks have ground truth and can be scored for precision and recall; the LLM summary is prose with no labeled ground truth, so it can only be checked for liveness and schema-validity. Collapsing those into a single number would overclaim the part I cannot measure.
+
+**Works with the public API, claims nothing about Figma.** Alternative: imply an integration or partnership. The tool reads a file through the public REST API, and the copy is explicit that the rules are the project's own heuristics, not Figma's criteria.
+
+## Interesting challenges
+
+Keeping the two evals honestly separate was the real discipline here. The deterministic layer has a clean story: on a 6-fixture set I authored by planting known issues, it scored precision 1.000 and recall 1.000, matched all six fixtures exactly, caught all 11 planted findings, and raised zero false positives. That result is offline-reproducible without an API key. The LLM layer is where it would be easy to overclaim. I live-verified that all six fixtures produced complete, schema-valid summaries, and that is all I claim for it: liveness and schema-validity, not accuracy, because the summary prose has no labeled ground truth to score against.
+
+The third thing I checked was robustness on a real file rather than only my own fixtures. Run against a large real-world community design system (roughly 4.9MB, thousands of nodes), the parser handled it cleanly and surfaced thousands of findings. That is a robustness result, not an accuracy one. I am not publishing a readiness score for that file, because a known limitation of the current scoring is that it does not normalize for file size and floors at zero on very large files. Real design systems accumulate exactly the kinds of findings the checks look for, so a raw penalty score saturates. Reporting that honestly is more useful than a number that would not mean what it appears to mean.
+
+## Results
+
+| Metric | Value | Qualifier |
+|---|---|---|
+| Precision / recall, deterministic checks | 1.000 / 1.000 | on its 6-fixture self-authored set; offline-reproducible without a key |
+| Fixtures matched exactly | 6/6 | self-authored fixtures with planted issues |
+| Planted findings caught | 11/11 | zero false positives on the same set |
+| LLM summaries, live run | schema-valid on all 6 | liveness and schema-validity only, explicitly not an accuracy score |
+| Real-world file robustness | ~4.9MB parsed cleanly | a large community design system, thousands of nodes; robustness not accuracy, no per-file score |
+| Offline test suite | 55 tests | ruff clean, GitHub Actions green on first run |
+
+## Scope and honest limits
+
+handoff-lens works with the public Figma REST API. It is not affiliated with or endorsed by Figma. The readiness rules are the project's own demonstration heuristics, not Figma's criteria, and the fixtures are hand-authored, not customer files.
+
+The two evals stay separate on purpose. The deterministic checks scored precision 1.000 and recall 1.000 on a 6-fixture self-authored set, which is a small set I wrote myself, not an independent benchmark. The LLM summary was verified only for liveness and schema-validity on all six fixtures, which is explicitly not an accuracy claim.
+
+A known limitation: the readiness score does not normalize for file size and floors at zero on very large files, which is why the real-world run is reported as robustness (it parsed cleanly and surfaced findings) rather than as a score.
+
+What this project does not claim: no Figma affiliation or employment, no real customer-file experience, no enterprise or production design-to-code deployment, and no suggestion that these heuristics are Figma's real readiness criteria.
+
+## Lessons
+
+The hardest honesty in an LLM-plus-rules tool is refusing to average the two into one number. The deterministic part earned a precision and recall figure; the generative part earned a liveness check and nothing more, and saying so is the difference between a defensible claim and a demo-grade one.
+
+Robustness and accuracy are different claims. Parsing a 4.9MB real file without falling over is worth showing. Pretending the resulting score means the same thing it means on a tiny fixture is not.
+
+## Future work
+
+- Normalize the readiness score for file size so large files get a meaningful number instead of flooring at zero.
+- Author or source fixtures beyond the current six, ideally not all by me, before trusting the precision and recall figures past a demo.
+- Add labeled ground truth for a sample of LLM summaries so the generative layer can eventually earn an accuracy claim instead of only a liveness one.
