@@ -33,6 +33,7 @@ metrics:
     qualifier: "inferred TypeScript types, imported by both the API and the dashboard"
 links:
   github: "https://github.com/armaangulati1/repsignal"
+  demo: "https://armaangulati1.github.io/repsignal/"
 diagram: "RepSignalArchitectureDiagram"
 tldr:
   - "A TypeScript and Node.js conversation-intelligence integration built in a day: a webhook ingests a sales-call transcript, a shared Zod schema validates it, Claude under forced tool-use returns a coaching scorecard, and a typed REST API plus a React dashboard serve it"
@@ -95,7 +96,7 @@ RepSignal is an independent one-day project. Every transcript is synthetic, self
 
 The eval is a self-authored synthetic 14-transcript set. The result of 66 of 70 LLM-judged field checks is a clean-enough score on that small set from a single live run, and because the LLM varies, it is representative rather than a fixed benchmark. The talk/listen ratio is a separate deterministic number, 14 of 14 by construction, and it is never folded into the 70. A larger or independently authored set would move the LLM-judged number.
 
-The `infra/` directory holds a minimal Terraform config as a demonstration of how the service would deploy. It was never applied. There is no hosted instance, which is why this write-up carries no live-demo link.
+The `infra/` directory holds a minimal Terraform config as a demonstration of how the service would deploy. It was never applied, so there is no live backend. The live demo at https://armaangulati1.github.io/repsignal/ is a static demo-mode build of the dashboard showing one synthetic sample scorecard (call-0003 from the eval set); it does not call the API and it uses no real data.
 
 What this project does not claim: no TypeScript or Node.js at production scale or over multiple years, because this is one project; no real customer-data, telephony, or CRM integration; no distributed data systems; and no Terraform beyond the single never-applied demo config.
 
