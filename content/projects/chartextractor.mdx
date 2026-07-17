@@ -31,6 +31,9 @@ metrics:
   - value: "29.8%"
     label: "LoRA fine-tune macro-F1, out-of-distribution"
     qualifier: "real notes; vs 48.0% untuned base and 53.8% prompted pipeline, single run, n=50"
+  - value: "1.000"
+    label: "Pre-bill checks precision/recall, exact-match"
+    qualifier: "10-fixture self-authored set (2 clean, 8 planted); CI gate at macro-F1 ≥ 0.99; not real-world billing accuracy"
 links:
   github: "https://github.com/armaangulati1/chartextract"
   demo: "https://chartextract-f9wfrftqzygappf2pgi3hts.streamlit.app/"
@@ -40,6 +43,7 @@ tldr:
   - "An agentic extraction pipeline pulling structured oncology variables from clinical notes; 93.6% macro-F1 on its evaluation set against a CI gate of at least 85%"
   - "The headline finding is the 40-point synthetic-to-real accuracy gap, published rather than hidden"
   - "Includes a controlled LoRA fine-tune that won in-distribution and lost out-of-distribution"
+  - "Adds a deterministic pre-bill review layer over the extracted chart: 8 self-authored checks and a claim-readiness report, 1.000 precision/recall on its 10-fixture self-authored set"
 ---
 
 ## Problem
@@ -77,6 +81,14 @@ The 40-point synthetic-to-real gap is the finding I'd lead with, not bury. The 6
 
 The LoRA experiment is the sharpest version of that lesson. I fine-tuned Qwen2.5-7B-Instruct-4bit with LoRA (MLX, on an M3 Max; 8 layers, 5.77M trainable params, 300 iterations over 179 training examples) on the gold-labeled extraction data. In-distribution, it won clearly: 99.3% macro-F1 on the CI gold set, beating the prompted pipeline's 93.6%. Out-of-distribution, it lost badly: 29.8% macro-F1 on real notes, against 48.0% for the untuned base model and 53.8% for the prompted pipeline, an 18-point drop below the base model it started from. The dominant failure was hallucinated over-extraction on sparse notes; the fine-tuned model never learned to abstain the way the prompted pipeline does. This is a single run on a small real test set (n=50), and I state that caveat every time the specific numbers come up.
 
+## Pre-bill review
+
+The pipeline produces structured chart output, and a downstream question follows naturally: would a claim built from this chart pass a first-pass review, or does it need a human first? The `prebill` package answers that deterministically and fully offline. It consumes the structured extraction output plus a minimal self-authored claim stub, runs 8 self-authored checks (PB001 through PB008), and returns a transparent readiness label of ready, needs_review, or hold with a documented penalty sum rather than an opaque score.
+
+The checks cover the failure modes a pre-bill reviewer actually looks for: a billed code with no documented support, missing required elements, internal field conflicts, a documentation-level mismatch, diagnosis-to-procedure inconsistency, duplicate or mutually-exclusive codes, a missing attestation, and a billed code that leans on a field the extractor itself routed to human review.
+
+An exact-match eval harness scores the checks at `(fixture, check_id)` granularity against their own goldens over 10 self-authored synthetic fixtures (2 clean and 8 with planted defects), and the result is precision and recall of 1.000 on that 10-fixture self-authored set. A CI gate holds macro-F1 at or above 0.99. Every rule, threshold, and code in the package is a self-authored demonstration heuristic, and every code is an invented placeholder, so no real payer rule or code system is reproduced. This is a generic analog of pre-bill review, not real claims scrubbing.
+
 ## Results
 
 | Metric | Value | Qualifier |
@@ -87,6 +99,7 @@ The LoRA experiment is the sharpest version of that lesson. I fine-tuned Qwen2.5
 | LoRA fine-tune macro-F1, in-distribution | 99.3% | CI gold set, single run, clean split |
 | LoRA fine-tune macro-F1, real notes | 29.8% | vs 48.0% base and 53.8% prompted pipeline; single run, n=50 |
 | Share of real-note errors that are hallucinations | 60.7% | real-note error taxonomy, 50 MTSamples notes |
+| Pre-bill checks (exact-match) | 1.000 P/R | 10-fixture self-authored set (2 clean, 8 planted), CI gate macro-F1 ≥ 0.99, not real-world billing accuracy |
 
 ## Lessons
 

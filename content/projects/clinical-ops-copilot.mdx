@@ -9,7 +9,9 @@ stack:
   - "MCP (Model Context Protocol)"
   - "FastAPI + HTMX"
   - "FHIR (HAPI, Synthea)"
-  - "X12 EDI"
+  - "X12 EDI (278, 835)"
+  - "HL7 v2 (ADT^A01, ORU^R01)"
+  - "Twilio Programmable Voice"
   - "Tesseract OCR"
   - "Playwright"
   - "Docker, Fly.io"
@@ -30,9 +32,15 @@ metrics:
   - value: "96/96"
     label: "OCR field accuracy"
     qualifier: "synthetic 12-letter eval, self-generated and self-scored"
-  - value: "188 / 215"
+  - value: "9/9"
+    label: "X12 835 denial-triage exact-match"
+    qualifier: "1.000 precision/recall per class on its 9-claim self-authored fixture set; invented denial-code system, synthetic data"
+  - value: "6/6"
+    label: "HL7 v2 ingestion exact-match"
+    qualifier: "self-authored synthetic HL7 v2 set; ingestion fidelity, not real-world interoperability"
+  - value: "310 / 337"
     label: "Tests passing (CI-gated / total)"
-    qualifier: "188 CI-gated (excludes network, ocr, browser marks); 215 total including those"
+    qualifier: "310 CI-gated (excludes network, ocr, browser marks); 337 total including those"
 links:
   github: "https://github.com/armaangulati1/clinical-ops-copilot"
   loom: "https://www.loom.com/share/2368c0f132fa4d2e8960dac7682592ff"
@@ -40,6 +48,7 @@ links:
 diagram: "AgentArchitectureDiagram"
 tldr:
   - "An LLM agent that reads live FHIR data and free-text notes, checks payer policy, and recommends prior-auth decisions behind a human approval gate"
+  - "Speaks the formats payers and hospitals use: X12 278 and 835 EDI plus an HL7 v2 ingestion layer, and takes a real phone call through a signature-validated Twilio voice agent"
   - "Deployed on Docker and Fly.io; 93.7% macro-F1 on a held-out set of synthetic cases; the LLM-as-judge failed its own validation and was cut from scoring"
   - "A synthetic-data demo, not a production system, and it never claims to be one"
 ---
@@ -60,6 +69,8 @@ This is the project I built to answer the question a customer-facing AI role act
 - The human approval gate is the last stop before anything leaves the system. No email is sent and no task is created until a staff member reviews it in the UI.
 - The X12 278 layer sits at the payer-format edge: a hand-rolled parser reads an inbound 278 REQUEST into the agent's existing `Case` input, and a generator emits a 278 RESPONSE from the agent's decision (submit → A1, request-more-info or deny-risk → A4, never A3).
 - OCR intake and a Playwright browser agent sit at the two intake/egress edges a deployment engineer actually touches: reading scanned decision letters, and reading authorization status back out of a payer portal (a self-built, clearly-labeled synthetic portal).
+- Two more payer-format edges mirror the 278 layer: a self-authored X12 835 remittance parser feeding a deterministic denial-triage layer, and an HL7 v2 ingestion layer (ADT^A01 and ORU^R01) that maps messages into the agent's existing FHIR fact-resolution path.
+- A real-telephony layer sits at the phone edge: a Twilio Programmable Voice webhook transcribes a spoken case number and question, routes it to the unchanged agent path, and speaks the decision back, with X-Twilio-Signature validation on every request.
 
 ## Technical decisions
 
@@ -81,6 +92,26 @@ The `deny-risk` to A4 mapping was a smaller but deliberate decision: the automat
 
 The OCR layer's honest surprise: raw tesseract genuinely garbles degraded scans (on one letter, "Case ID" reads as "Case 1D"), and the tolerant parser recovers the field anyway through case-insensitive matching and light noise remapping. The 96/96 field accuracy is real, but it's 100% on a 12-letter set I generated and scored myself, not a claim about real payer letters.
 
+## Live telephony
+
+The copilot also answers a real phone call. A caller dials a Twilio number, Twilio Programmable Voice transcribes the speech, a FastAPI TwiML webhook routes the case number to the unchanged agent decision path, and the decision is spoken back on the call. The telephony layer only routes and phrases; the agent makes the whole decision, exactly as it does from the command line. I verified this end to end on 2026-07-16 with a real inbound call: I spoke a case number and a question, and I heard the agent's spoken decision back.
+
+Two design details carry the section.
+
+**Every webhook request is signature-validated.** I hand-rolled the `X-Twilio-Signature` check, implementing Twilio's documented HMAC-SHA1 algorithm directly so the security-critical path has no runtime dependency on the Twilio SDK and stays fully testable offline. A test cross-checks it byte for byte against the official SDK validator, the comparison is constant-time, and there is no bypass path. During the live session, every unsigned probe was rejected with a 403.
+
+**Hold-and-poll under a hard 15-second deadline.** A full agent decision takes roughly as long as Twilio's 15-second webhook timeout, so answering synchronously makes Twilio give up and play an error message. The first request instead starts the agent as a background task keyed by the call id, returns an immediate spoken hold message, and redirects Twilio to poll back; the decision is read on whichever poll finds the task finished. Only the timing of when the answer is spoken changes, and the agent path stays untouched.
+
+This is a demo on the parent repo's synthetic cases, routed by case number only. It is not a call-center system and it is not telephony at scale.
+
+## Claims-lifecycle interop
+
+The X12 278 prior-auth layer is one of three demo-scope interop layers that let the copilot speak the formats payers and hospitals actually move data in. Two more sit alongside it, each built on the same hand-rolled tokenizer and error core, and each on synthetic self-authored data.
+
+**X12 835 remittance parser and denial-triage layer.** A self-authored X12 835 (claim payment and remittance advice) subset parses into a typed `RemittanceAdvice`: claims, billed versus paid, and denial codes. A deterministic denial-triage layer, with no model in the loop and a recommendation that is a pure function of the codes, then routes each claim to one of four actions: no-action, resubmit-with-documentation, correct-and-rebill, or needs-human-review. It uses a conservative precedence and two fail-safe-to-human paths, one for an unrecognized code and one for an underpayment with no coded reason. It reaches 9/9 exact-match with precision and recall of 1.000 per class on its 9-claim self-authored fixture set. The denial codes are an invented `DR-*` system carried in an invented `DRC` segment, not real CARC or RARC content, and the data is synthetic, so this is a remittance-review simulation rather than real denial management.
+
+**HL7 v2 ingestion layer.** Most hospital feeds still move over HL7 v2 pipe-and-caret messages rather than FHIR. A dependency-free HL7 v2 ingestion layer parses the admit and observation-result message types (ADT^A01 and ORU^R01), resolves the delimiters from the MSH header, handles HL7 escape sequences, and maps the result into the copilot's existing FHIR fact-resolution path. It scores 6/6 exact-match on its self-authored synthetic HL7 v2 set, so the number measures ingestion fidelity and regression, never real-world interoperability. In the same honest-evals spirit as the rest of the project, the mapping is additive: a diff of the agent, schema, and FHIR-client code against main comes back empty, which proves the existing decision path was byte-untouched. This is a demo-scope subset, not a certified interface engine.
+
 ## Results
 
 | Metric | Value | Qualifier |
@@ -89,9 +120,11 @@ The OCR layer's honest surprise: raw tesseract genuinely garbles degraded scans 
 | Deny-risk recall | 1.000 | was 0.600 pre-guardrail-fix |
 | FHIR-fusion macro-F1 vs note-only | 1.0000 vs 0.2456 | n=12 Ozempic/T2D synthetic Synthea cases, decision-logic eval |
 | X12 278 round-trip decision agreement | 16/16 (100%) | self-consistency test; ingestion fidelity only, exercises submit and request-more-info classes only |
+| X12 835 denial-triage | 9/9 (100%), 1.000 P/R per class | 9-claim self-authored fixture set; invented denial-code system, synthetic data, remittance-review simulation |
+| HL7 v2 ingestion | 6/6 (100%) | self-authored synthetic set; ingestion fidelity and regression, not real-world interoperability |
 | OCR field accuracy | 96/96 | synthetic 12-letter eval, self-generated and self-scored |
 | Chaos test (30% injected failure) | 40/40 idempotent sends, 20/20 action bundles | no double-sends, no duplicate completions |
-| Tests | 188 CI-gated / 215 total | non-network/ocr/browser gate vs full suite incl. tool-marked tests |
+| Tests | 310 CI-gated / 337 total | non-network/ocr/browser gate vs full suite incl. tool-marked tests |
 
 ## Lessons
 
